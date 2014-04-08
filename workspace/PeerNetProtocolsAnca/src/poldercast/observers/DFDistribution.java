@@ -1,0 +1,118 @@
+/**
+ * 
+ */
+package poldercast.observers;
+
+import java.text.DecimalFormat;
+import java.util.AbstractMap;
+import java.util.AbstractMap.SimpleEntry;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Set;
+import java.util.Map.Entry;
+import java.util.Vector;
+
+import peernet.config.Configuration;
+import peernet.core.Control;
+import peernet.core.Network;
+import peernet.core.Node;
+import poldercast.protocols.Dissemination;
+import topics.Topic;
+
+/**
+ * @author anca
+ *
+ */
+public class DFDistribution implements Control
+{
+  int pid;
+  int cycle = 0;
+  int size = 0;
+  /**
+   * 
+   */
+  public DFDistribution(String name)
+  {
+    pid = Configuration.getPid(name+"."+PAR_PROTOCOL);
+    size = Network.size();
+  }
+
+
+
+  /* (non-Javadoc)
+   * @see peernet.core.Control#execute()
+   */
+  @Override
+  public boolean execute()
+  {
+    cycle++;
+    computeDFDistribution();
+    return false;
+  }
+
+
+
+  /**
+   * 
+   */
+  private void computeDFDistribution()
+  {
+    HashMap<Integer, Integer> dup = new HashMap<Integer,Integer>();
+    for(int i = 0; i< Network.size(); i++)
+    {
+      Node n = Network.get(i);
+      Dissemination dissem = (Dissemination)n.getProtocol(pid);
+      int duplicate = 0;
+      if (!dissem.getDuplicateMessages().isEmpty())
+      {
+        Set<Entry<Topic,Integer>> set = dissem.getDuplicateMessages().entrySet();
+        Iterator<Entry<Topic, Integer>> it = set.iterator();
+        while (it.hasNext())
+        {
+          Entry<Topic,Integer> entry = it.next();
+          duplicate += entry.getValue();
+          
+          if(dup.get(duplicate) == null)
+            dup.put(duplicate, 1);
+          else
+            dup.put(duplicate, dup.get(duplicate)+1);
+        }
+      }
+      dissem.resetDuplicateMessages();
+    }
+    
+    Vector<AbstractMap.SimpleEntry<Integer,Integer>> df = new Vector<AbstractMap.SimpleEntry<Integer,Integer>>();//duplicate factor
+    
+    Set<Entry<Integer,Integer>> set = dup.entrySet();
+    Iterator<Entry<Integer,Integer>> it = set.iterator();
+    int totalHits = 0;
+    while (it.hasNext())
+    {
+      Entry<Integer,Integer> entry = it.next();
+      totalHits += entry.getValue();
+      AbstractMap.SimpleEntry<Integer, Integer> pair = new AbstractMap.SimpleEntry<Integer, Integer>(entry.getKey(),entry.getValue());
+      df.add(pair);
+    }
+    
+    Collections.sort(df, new Comparator<AbstractMap.SimpleEntry<Integer, Integer>>()
+    {
+
+      @Override
+      public int compare(SimpleEntry<Integer, Integer> o1, SimpleEntry<Integer, Integer> o2)
+      {
+        return o1.getKey()-o2.getKey();
+      }
+    });
+    
+    for (int i = 0; i< df.size(); i++)
+    {
+      int higherHits = 0;
+      for (int j = i+1; j< df.size(); j++)
+        higherHits += df.get(j).getValue();
+      System.out.println(df.get(i).getKey() + " " + new DecimalFormat("#.#####").format((double)higherHits/totalHits));
+    }  
+    
+  }
+}

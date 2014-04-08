@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry excluding="p_ring/|flood/CopyOfFlood_PulpPull.java|gossip/protocol/CyclonNano.java|gossip/protocol/KillLast.java|gossip/protocol/ListTopology.java|gossip/protocol/NodeNano.java|spidercast/|gossip/vicinity/TargetOverlay.java|gossip/vicinity/TargetOverlayObserver.java|gossip/vicinity/VicinitySettingsWS.java|flood/|gossip/vicinity/CyclonNano.java|gossip/vicinity/KillLast.java|gossip/vicinity/ListTopology.java|gossip/vicinity/NodeNano.java|var/CyclonNano.java|var/KillLast.java|var/ListTopology.java|var/NodeNano.java|var/TargetOverlay.java|var/TargetOverlayObserver.java|var/VicinitySettingsWS.java|netsize/MinTopK.java|powerlaw/" kind="src" path="src"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.6"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/PeerNet"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

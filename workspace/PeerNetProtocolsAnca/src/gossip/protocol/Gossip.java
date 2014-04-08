@@ -1,0 +1,173 @@
+/*
+ * Created on Jul 20, 2007 by Spyros Voulgaris
+ *
+ */
+package gossip.protocol;
+
+import java.util.Comparator;
+import java.util.Vector;
+
+import peernet.core.Descriptor;
+import peernet.core.Linkable;
+import peernet.core.Protocol;
+
+/**
+ * @author Spyros Voulgaris
+ *
+ * This is the base class for all gossiping protocols
+ */
+public abstract class Gossip extends Protocol implements Linkable
+{
+  /**
+   * This is the network view of gossiping protocols.
+   * It is a Vector of 'Descriptor' objects, or of its subclasses.
+   */
+  public Vector<Descriptor> view;
+
+  /**
+   * Name
+   */
+  public String name = "anonymous node";
+  
+  // ------------------------------------------------------------
+  // ----------------- Initialization methods -------------------
+  // ------------------------------------------------------------
+
+  /**
+   * Default constructor.
+   * Called only once for a new protocol class instance.
+   */
+  public Gossip(String prefix)
+  {
+    super(prefix);
+  }
+
+  /**
+   * Individual views are instantiated by means of the clone function.
+   */
+  public Object clone()
+  {
+    Gossip gossip = (Gossip)super.clone();
+
+    // No need for deep cloning of 'view'.
+    gossip.view = (Vector<Descriptor>)view.clone();
+    //gossip.name = "c"+CommonState.getNode().getID();
+
+    return gossip;
+  }
+
+
+  // ------------------------------------------------------------
+  // --------------- Implementation of Linkable -----------------
+  // ------------------------------------------------------------
+  /**
+   * Not implementing pack(), and no subclass is allowed
+   * to implement it. Execution of pack() will trigger
+   * a definite assertion.
+   */
+  public final void pack()
+  {
+    assert false : "Not implemented";
+  }
+
+
+  public int degree()
+  {
+    return view.size();
+  }
+
+
+  public Descriptor getNeighbor(int i)
+  {
+    return view.elementAt(i);
+  }
+
+
+  public boolean contains(Descriptor neighbor)
+  {
+    return view.contains(neighbor);
+  }
+
+
+
+  /**
+   * Assuming that the cache is sorted so that view from the same node
+   * lay in consecutive positions, this method eliminates duplicate entries.
+   * More specifically, for any two view from the same node, it keeps
+   * the one suggested by the keepComparator, and removes the other.
+   * Does not work correctly if the cache is not already sorted.
+   */
+  protected final Vector<Descriptor> eliminateDuplicates_sorted(Vector<Descriptor> descriptors, Comparator<Descriptor> duplCmp)
+  {
+    Vector<Descriptor> removed = new Vector<Descriptor>();
+    Descriptor curItem;
+    Descriptor nextItem = descriptors.lastElement();
+
+    for (int i=descriptors.size()-2; i>=0; i--)
+    {
+      curItem = descriptors.elementAt(i);
+      if (curItem.equals(nextItem))
+      {
+        if (duplCmp.compare(curItem, nextItem) < 0)
+          removed.add(descriptors.remove(i+1));
+        else
+          removed.add(descriptors.remove(i));
+      }
+      else
+        nextItem = curItem;
+    }
+    return removed;
+  }
+
+
+  /**
+   * The same as {@link #eliminateDuplicates_sorted()}, but without
+   * assuming a sorted cache. Obviously, this one is more expensive.
+   * More specifically, for any two view from the same node, it keeps
+   * the one suggested by the keepComparator, and removes the other.
+   * Does not work correctly if the cache is not already sorted.
+   */
+  protected final Vector<Descriptor> eliminateDuplicates(Vector<Descriptor> descriptors, Comparator<Descriptor> duplCmp)
+  {
+    Vector<Descriptor> removed = new Vector<Descriptor>();
+
+    // Start from the end of the list
+    for (int a=descriptors.size()-1; a>=0; a--)
+    {
+      Descriptor descrA = descriptors.elementAt(a);
+      // Start from node[a-1], and check all the way to node[0]
+      for (int b=a-1; b>=0; b--)
+      {
+        if (descriptors.elementAt(b).equals(descrA)) // if descrB==descrA
+        {
+          if (duplCmp.compare(descriptors.elementAt(a),
+                              descriptors.elementAt(b))<0)
+          {
+            // We have to evoke node[b].
+            removed.add(descriptors.remove(b));
+
+            // Now node[a]'s index has changed to a-1. So, decrease a, and let
+            // the b-loop (inner) continue, to check with the rest in,
+            // from b-1 to 0.
+            a--;
+          }
+          else
+          {
+            // We have to evoke node[a].
+            removed.add(descriptors.remove(a));
+
+            // Then, since node[a] is removed, stop comparing it to other in,
+            // and move to the next iteration of the a-loop (outer).
+            break;
+          }
+        }
+      }
+    }
+    return removed;
+  }
+  
+  public void onKill()
+  {
+    view = null;
+  }
+}
