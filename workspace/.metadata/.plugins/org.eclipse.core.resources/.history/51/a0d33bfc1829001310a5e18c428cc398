@@ -1,0 +1,120 @@
+/**
+ * 
+ */
+package poldercast.observers;
+
+import java.text.DecimalFormat;
+import java.util.AbstractMap;
+import java.util.AbstractMap.SimpleEntry;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
+import java.util.Vector;
+import java.util.Map.Entry;
+
+import peernet.config.Configuration;
+import peernet.core.Control;
+import peernet.core.Network;
+import peernet.core.Node;
+import poldercast.protocols.Dissemination;
+import poldercast.topics.Topics;
+import poldercast.topics.TopicsRepository;
+
+/**
+ * @author anca
+ *
+ */
+public class DelayDistribution implements Control
+{
+  int pid;
+  int cycle = 0;
+  int size = 0;
+  Vector<Topics> topics = null;  
+  /**
+   * 
+   */
+  public DelayDistribution(String name)
+  {
+    pid = Configuration.getPid(name+"."+PAR_PROTOCOL);
+    topics = TopicsRepository.getAllTopics(); 
+    size = topics.size();
+  }
+
+
+
+  /* (non-Javadoc)
+   * @see peernet.core.Control#execute()
+   */
+  @Override
+  public boolean execute()
+  {
+    cycle++;
+    computeDelayDistribution();
+    System.out.println();
+    return false;
+  }
+
+
+
+  /**
+   * 
+   */
+  private void computeDelayDistribution()
+  {
+    HashMap<Integer,Integer> hops = new HashMap<Integer,Integer>();
+    for (int topic : topics)
+    {      
+      Vector<Long> subscribers = TopicsRepository.getSubscribers(topic);
+      for (long subscr : subscribers)
+      {
+        Node n = Network.getByID((int) subscr);
+        Dissemination dissem = (Dissemination)n.getProtocol(pid);
+        int myHops = -1;
+        if (dissem.getMsgHopCounter().get(topic) != null)
+          myHops = dissem.getMsgHopCounter().get(topic);
+        if (myHops > 0)
+        {
+              dissem.resetHopCounter(topic);
+              if (hops.get(myHops) == null)
+                hops.put(myHops, 1);
+              else
+                hops.put(myHops, hops.get(myHops)+1);
+           
+        }
+        dissem.resetHopCounter(topic);
+      }
+    }
+    Set<Entry<Integer,Integer>> set = hops.entrySet();
+    Iterator<Entry<Integer,Integer>> it = set.iterator();
+    Vector<AbstractMap.SimpleEntry<Integer,Integer>> cdf = new Vector<AbstractMap.SimpleEntry<Integer,Integer>>();
+    int totalHits = 0;
+    while (it.hasNext())
+    {
+      Entry<Integer,Integer> entry = it.next();
+      totalHits += entry.getValue();
+      AbstractMap.SimpleEntry<Integer, Integer> pair = new AbstractMap.SimpleEntry<Integer, Integer>(entry.getKey(),entry.getValue());
+      cdf.add(pair);
+    }
+    
+    Collections.sort(cdf, new Comparator<AbstractMap.SimpleEntry<Integer, Integer>>()
+    {
+
+      @Override
+      public int compare(SimpleEntry<Integer, Integer> o1, SimpleEntry<Integer, Integer> o2)
+      {
+        return o1.getKey()-o2.getKey();
+      }
+    });
+    
+    for (int i = 0; i< cdf.size(); i++)
+    {
+      int higherHits = 0;
+      for (int j = i+1; j< cdf.size(); j++)
+        higherHits += cdf.get(j).getValue();
+      System.out.println(cdf.get(i).getKey() + " " + new DecimalFormat("#.#####").format((double)higherHits/totalHits));
+    }  
+  }
+}

@@ -1,0 +1,26 @@
+/**
+ * 
+ */
+package tera.protocols;
+
+import peernet.core.Protocol;
+import peernet.core.ProtocolSettings;
+
+/**
+ * @author anca
+ *
+ */
+public class SubscriptionManagementSettings extends ProtocolSettings
+{
+  private static final String PAR_D = "d";
+  int d;
+  /**
+   * @param prefix
+   */
+  public SubscriptionManagementSettings(String prefix)
+  {
+    super(prefix);
+    prefix = prefix.replace("."+Protocol.PAR_SETTINGS, "");
+    
+  }
+}

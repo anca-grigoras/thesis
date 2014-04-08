@@ -1,0 +1,670 @@
+package rubiks.ipl;
+
+import ibis.ipl.Ibis;
+import ibis.ipl.IbisCapabilities;
+import ibis.ipl.IbisFactory;
+import ibis.ipl.IbisIdentifier;
+import ibis.ipl.PortType;
+import ibis.ipl.ReadMessage;
+import ibis.ipl.ReceivePort;
+import ibis.ipl.SendPort;
+import ibis.ipl.WriteMessage;
+import ibis.ipl.IbisProperties;
+import ibis.ipl.MessageUpcall;
+import ibis.ipl.ReceivePortIdentifier;
+
+import java.io.IOException; 
+import java.lang.ClassNotFoundException;
+import java.util.*;
+import java.util.Map.Entry;
+
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
+import com.sun.org.apache.bcel.internal.generic.NEW;
+
+/**
+ *  * This program is to be run as two instances. One is a server, the other a
+ *   * client. The client sends a hello message to the server. The server prints it.
+ *    * This version uses explicit receive.
+ *     */
+
+public class Rubiks implements MessageUpcall {
+
+
+	/**
+	 * Port type used for sending the ReceivePortIdentifiers to the master
+	 */
+	/*PortType initPortType = new PortType(PortType.COMMUNICATION_RELIABLE,
+            PortType.SERIALIZATION_OBJECT, PortType.RECEIVE_EXPLICIT,
+            PortType.CONNECTION_MANY_TO_ONE);
+	 */
+
+	PortType requestPortType = new PortType(PortType.COMMUNICATION_RELIABLE,
+			PortType.SERIALIZATION_OBJECT, PortType.RECEIVE_AUTO_UPCALLS,
+			PortType.CONNECTION_MANY_TO_ONE);
+
+	/**
+	 * Port type used for sending a reply back
+	 */
+	PortType replyPortType = new PortType(PortType.COMMUNICATION_RELIABLE,
+			PortType.SERIALIZATION_OBJECT, PortType.RECEIVE_EXPLICIT,
+			PortType.CONNECTION_ONE_TO_ONE);
+
+
+
+	IbisCapabilities ibisCapabilities = new IbisCapabilities(
+			IbisCapabilities.ELECTIONS_STRICT, IbisCapabilities.CLOSED_WORLD);
+
+	public static final boolean PRINT_SOLUTION = false;
+
+	private final int INITIAL_BOUND = 2; //the number of twists the master initially do to generate jobs for workers
+
+	private final Ibis myIbis;
+	private IbisIdentifier master;
+	private ReceivePort receivePort;
+
+	private long start =0;
+	private long end =0;
+
+	private int bound = 0;
+	private int initialTwists = 0;
+
+	private List<Cube> jobs = new ArrayList<Cube>();// this list with jobs is permanent. Once the master generates it, it does not modify
+	private Map<Cube, Integer> tempJobs = new HashMap<Cube,Integer>();//this list copies the jobs from the permanent jobs list and distributes them to workers. This step repeats for every bound.
+
+	private int result = 0; //the number of solved cubes
+	private int numberOfWorkers = 0; //the number of workers
+
+	private CubeCache cache = null; 
+
+	private final int jobsForWorker = 4;// how many jobs the master will send to a slave at one time
+	private final int jobsForMaster = 2;//how many jobs the master will assign to itself at one time
+
+	private int nrSentJobs = 0;
+	private int executingWorkers = 0;
+
+	boolean waitForWork = true;
+
+	Lock lock = new ReentrantLock();
+
+	private boolean terminateWork = false;
+	private boolean isSolved = false;
+	Condition solvedCube = lock.newCondition();
+
+	private int terminatedWorkers = 0;
+	Condition waitingWorkers = lock.newCondition();
+
+	private boolean isGenerated = false;
+	Condition generatedJobs = lock.newCondition();
+
+	Condition stopMaster = lock.newCondition();
+
+	private boolean masterWait = true;
+	private boolean solutionWithinInitialBound = false;
+
+	/**
+	 * Constructor. Actually does all the work too :)
+	 */
+	private Rubiks(String[] args) throws Exception {
+		// Create an ibis instance.
+		// Notice createIbis uses varargs for its parameters.
+		myIbis = IbisFactory.createIbis(ibisCapabilities, null, requestPortType, replyPortType);
+
+		// Elect a master
+		master = myIbis.registry().elect("Master");
+
+		// If I am the master, run master, else run slave.
+		if (master.equals(myIbis.identifier())) {
+			Cube cube = initCube(args);
+			master(cube); 
+		} else 
+			slave(master);
+
+		// End ibis.
+		myIbis.end();
+	}
+
+	private Cube initCube(String[] arguments){
+
+		Cube cube = null;
+
+		// default parameters of puzzle
+		int size = 3;
+		int twists = 11;
+		int seed = 0;
+		String fileName = null;
+
+		// number of threads used to solve puzzle
+		// (not used in sequential version)
+
+		for (int i = 0; i < arguments.length; i++) {
+			if (arguments[i].equalsIgnoreCase("--size")) {
+				i++;
+				size = Integer.parseInt(arguments[i]);
+			} else if (arguments[i].equalsIgnoreCase("--twists")) {
+				i++;
+				twists = Integer.parseInt(arguments[i]);
+			} else if (arguments[i].equalsIgnoreCase("--seed")) {
+				i++;
+				seed = Integer.parseInt(arguments[i]);
+			} else if (arguments[i].equalsIgnoreCase("--file")) {
+				i++;
+				fileName = arguments[i];
+			} else if (arguments[i].equalsIgnoreCase("--help") || arguments[i].equalsIgnoreCase("-h")) {
+				printUsage();
+				System.exit(0);
+			} else {
+				System.err.println("unknown option : " + arguments[i]);
+				printUsage();
+				System.exit(1);
+			}
+		}
+
+		if (fileName == null) {
+			cube = new Cube(size, twists, seed);
+		} else {
+			try {
+				cube = new Cube(fileName);
+			} catch (Exception e) {
+				System.err.println("Cannot load cube from file: " + e);
+				System.exit(1);
+			}
+		}
+		initialTwists = twists;
+		System.out.println("Searching for solution for cube of size "
+				+ cube.getSize() + ", twists = " + twists + ", seed = " + seed);
+		cube.print(System.out);
+		System.out.flush();
+		return cube;
+	}
+
+	public static void printUsage() {
+		System.out.println("Rubiks Cube solver");
+		System.out.println("");
+		System.out
+		.println("Does a number of random twists, then solves the rubiks cube with a simple");
+		System.out
+		.println(" brute-force approach. Can also take a file as input");
+		System.out.println("");
+		System.out.println("USAGE: Rubiks [OPTIONS]");
+		System.out.println("");
+		System.out.println("Options:");
+		System.out.println("--size SIZE\t\tSize of cube (default: 3)");
+		System.out
+		.println("--twists TWISTS\t\tNumber of random twists (default: 11)");
+		System.out
+		.println("--seed SEED\t\tSeed of random generator (default: 0");
+		System.out
+		.println("--threads THREADS\t\tNumber of threads to use (default: 1, other values not supported by sequential version)");
+		System.out.println("");
+		System.out
+		.println("--file FILE_NAME\t\tLoad cube from given file instead of generating it");
+		System.out.println("");
+	}
+
+	private void master (Cube cube) throws IOException, Exception, ClassNotFoundException {
+
+		// Create a receive port, pass ourselves as the message upcall handler
+		receivePort = myIbis.createReceivePort(requestPortType, "master", this);
+		// enable connections
+		receivePort.enableConnections();
+		// enable upcalls
+		receivePort.enableMessageUpcalls();
+
+		numberOfWorkers = myIbis.registry().getPoolSize();
+		start = System.currentTimeMillis();
+		System.out.print("Bound now:");
+
+		generateJobs(cube);
+		
+		//if (!isSolved)
+			workMaster();
+			
+		
+		lock.lock();
+		try{
+			isGenerated = true;
+			generatedJobs.signalAll();
+		} finally {
+			lock.unlock();
+		}
+
+		lock.lock();
+		try {
+			//while (!isSolved || terminatedWorkers != numberOfWorkers)
+			while (masterWait )
+				stopMaster.await();
+		} finally {
+			lock.unlock();
+		}
+
+		end = System.currentTimeMillis();
+		printResult();
+
+		// Close receive port.
+		receivePort.close();
+
+	}
+
+	private void generateJobs(Cube cube){
+		cache = new CubeCache(cube.getSize());
+		result += getJobs(cube, cache, 1);
+		if (result != 0) //the end
+		{
+			if (bound == 0) bound = 1;
+			for (int i = 1; i<= bound; i++)
+				System.out.print(" " + i);
+			solutionWithinInitialBound = true;
+			isSolved = true;
+		}
+		else
+		{
+			bound = INITIAL_BOUND;
+			for (int i = 1; i<= bound; i++)
+				System.out.print(" " + i);
+			for (int i = 0; i< jobs.size(); i++)
+				tempJobs.put(jobs.get(i), bound); 
+		}
+	}
+
+	private int getJobs(Cube cube, CubeCache cache, int depth)
+	{
+		if (cube.isSolved()) {
+			bound = cube.getTwists();
+			return 1;
+		}
+		if (cube.getTwists() >= INITIAL_BOUND) {
+			return 0;
+		}     
+
+		Cube[] children = cube.generateChildren(cache);
+		for (Cube child: children)
+			jobs.add(child);
+
+		if (depth >= INITIAL_BOUND || depth > initialTwists)
+		{
+			//bound = depth-1;
+			return 0;
+		}
+
+		int res = 0;
+		for (Cube child : children) {
+			jobs.remove(child);
+			// recursion step
+			int childSolutions = getJobs(child, cache, depth+1);
+			if (childSolutions > 0) {
+				res += childSolutions;
+				if (PRINT_SOLUTION) {
+					child.print(System.err);
+				}
+			}
+			// put child object in cache
+			cache.put(child);
+		}
+
+	//	if(result > 0) System.out.println("result found");
+		return res;
+	}
+	
+	/**
+	 * 
+	 */
+	private void workMaster() {
+		
+		boolean stop = false;
+		int myResult = 0;
+		int myBound = 0;
+		Map<Cube,Integer> myJobs = new HashMap<Cube,Integer>();		
+		while (!stop)
+		{
+			System.out.println("i am here");
+			//System.out.println("i am the slave : bound : " + myBound  + " result : " + myResult);
+			//requestJob(myResult);
+			//Object obj = receiveJobs();
+			Object obj = dealWithRequest(null, myResult, true);
+
+			if (obj instanceof Boolean)
+				stop = (Boolean)obj;
+			else
+			{				
+				myJobs.clear();
+				myJobs.putAll((HashMap<Cube,Integer>)obj);
+
+				if (myJobs != null)
+				{	//System.out.println("I received " + myJobs.size() + " jobs");
+					Set<Map.Entry<Cube, Integer>> myJobsSet = myJobs.entrySet();
+					myResult = 0;
+					for (Map.Entry<Cube, Integer> job : myJobsSet)
+					{
+						Cube cube = job.getKey();
+						CubeCache cache = new CubeCache(cube.getSize());
+						myBound = job.getValue();
+						cube.setBound(myBound);
+						myResult += solutions(cube, cache);
+						//if (myResult > 0)
+							//System.out.println("for bound " + myBound + " result " + myResult);
+					}					
+					//Thread.sleep(100);
+				} 
+			}
+		}
+
+	}
+
+	private void slave(IbisIdentifier master) throws IOException, Exception, ClassNotFoundException {
+
+		receivePort = myIbis.createReceivePort(replyPortType, null);
+		receivePort.enableConnections();
+
+		work();
+		//System.out.println("I am stopping");
+		receivePort.close();
+	}
+
+	@SuppressWarnings("unchecked")
+	private void work(){
+		boolean stop = false;
+		int myResult = 0;
+		int myBound = 0;
+		Map<Cube,Integer> myJobs = new HashMap<Cube,Integer>();		
+		while (!stop)
+		{
+			//System.out.println("i am the slave : bound : " + myBound  + " result : " + myResult);
+			requestJob(myResult);
+			Object obj = receiveJobs();
+
+			if (obj instanceof Boolean)
+				stop = (Boolean)obj;
+			else
+			{				
+				myJobs.clear();
+				myJobs.putAll((HashMap<Cube,Integer>)obj);
+
+				if (myJobs != null)
+				{	//System.out.println("I received " + myJobs.size() + " jobs");
+					Set<Map.Entry<Cube, Integer>> myJobsSet = myJobs.entrySet();
+					myResult = 0;
+					for (Map.Entry<Cube, Integer> job : myJobsSet)
+					{
+						Cube cube = job.getKey();
+						CubeCache cache = new CubeCache(cube.getSize());
+						myBound = job.getValue();
+						cube.setBound(myBound);
+						myResult += solutions(cube, cache);
+						//if (myResult > 0)
+							//System.out.println("for bound " + myBound + " result " + myResult);
+					}					
+					//Thread.sleep(100);
+				} 
+			}
+		}
+
+	}
+
+
+	/** 
+	 * Function called by Ibis to give us a newly arrived message
+	 **
+	 ** @param message
+	 **            the message
+	 ** @throws IOException
+	 **            when the message cannot be read
+	 **/
+	public void upcall(ReadMessage message) throws IOException, ClassNotFoundException {
+
+		Object obj = message.readObject();
+		message.finish();
+		
+		
+		if (obj instanceof AbstractMap.SimpleEntry) // the worker asked for jobs
+		{
+		
+			AbstractMap.SimpleEntry<ReceivePortIdentifier, Integer> idresult = (AbstractMap.SimpleEntry<ReceivePortIdentifier, Integer>) obj; 
+		
+			ReceivePortIdentifier requestor = idresult.getKey();
+			int workerResult = idresult.getValue();
+			
+			dealWithRequest(requestor, workerResult, false);
+		}
+	}
+	
+	private Object dealWithRequest(ReceivePortIdentifier requestor, int res, boolean isMaster)
+	{
+		lock.lock();
+		try {
+			result += res;
+			//System.out.println(bound + " ------- " + workerResult);
+			if (result > 0)
+				isSolved = true;
+		} finally {
+			lock.unlock();
+		}
+		
+		Object obj = manageRequest(requestor, res, isMaster);
+		
+		lock.lock();
+		try {
+			if (isSolved)
+			{
+				if(terminatedWorkers == numberOfWorkers)
+				{
+					masterWait = false;
+					stopMaster.signal();
+				}
+			}
+		} finally {
+			lock.unlock();
+		}
+		
+		return obj;
+	}
+
+	/**
+	 * 
+	 */
+	private Object manageRequest(ReceivePortIdentifier requestor, int res, boolean isMaster) {
+		lock.lock();
+		try {
+			System.out.println("and here " + solutionWithinInitialBound + "  " + isGenerated);			
+			while (!isGenerated)
+				generatedJobs.await();
+			
+			if (solutionWithinInitialBound)
+			{
+				terminateWork = true;
+				terminatedWorkers++;
+				System.out.println("terminated : " + terminatedWorkers);
+				if (!isMaster)
+					notifyWorkers(requestor);
+				return true;
+			}
+			
+			//manage barrier arrival
+			if (nrSentJobs == jobs.size()) //all the jobs for the current bound have been sent
+			{
+				executingWorkers++;
+				//System.out.println("I am here : " + executingWorkers);
+				waitForWork = true;
+				if (executingWorkers != numberOfWorkers){	
+					while (waitForWork)
+						try {
+							waitingWorkers.await();
+						} catch (InterruptedException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+
+				}else{	
+					//System.out.println("res -> " + result + "   :   " + executingWorkers);
+					if (!isSolved)
+					{ //go to the next bound and send to the workers jobs to execute
+						executingWorkers = 0;
+						nrSentJobs = 0;
+						bound++;
+						System.out.print(" " + bound);
+						for (int i = 0; i< jobs.size(); i++)
+							tempJobs.put(jobs.get(i), bound);
+
+					}
+					waitForWork=false;
+					waitingWorkers.signalAll();
+
+				}
+				if (isSolved)
+				{
+					terminateWork = true;
+					terminatedWorkers++;
+					if (!isMaster)
+						notifyWorkers(requestor);
+					return true;
+				}
+			}			
+
+			int nrJobs = (isMaster) ? jobsForMaster : jobsForWorker;
+			
+			if (nrJobs > tempJobs.size())
+				nrSentJobs += tempJobs.size();
+			else
+				nrSentJobs += nrJobs;
+			int size = ((nrJobs < tempJobs.size()) ? nrJobs : tempJobs.size());
+			Map<Cube,Integer> jobsForWorker = createJobsForWorker(size);
+			if (!isMaster)
+				sendJobsToWorker(requestor, jobsForWorker);
+			return jobsForWorker;
+
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} finally {
+			lock.unlock();
+		}
+		return null;
+	}
+
+	private void notifyWorkers(ReceivePortIdentifier requestor) {
+		try {
+			SendPort sender = myIbis.createSendPort(replyPortType);
+			sender.connect(requestor);
+			WriteMessage message = sender.newMessage();
+			message.writeObject(terminateWork);
+			message.finish();
+			sender.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}		
+	}
+
+
+	/**
+	 * create a job list just for this worker and send it to him
+	 * @return
+	 */
+	private Map<Cube,Integer> createJobsForWorker(int size){		
+		Map<Cube,Integer> workerJobs = new HashMap<Cube,Integer>();
+		lock.lock();
+		try{	
+			Set<Map.Entry<Cube, Integer>> jobSet = tempJobs.entrySet();
+			Iterator<Map.Entry<Cube, Integer>> it = jobSet.iterator();
+			int i = 0;
+			while(it.hasNext() && (i < size))
+			{
+				i++;
+				Map.Entry<Cube,Integer> e = it.next();
+				workerJobs.put(e.getKey(), e.getValue());
+				it.remove();
+			}	
+		}finally{
+			lock.unlock();
+		}
+		return workerJobs;
+	}
+
+	private void sendJobsToWorker(ReceivePortIdentifier worker, Map<Cube, Integer> workerJobs)
+	{
+		try {
+			SendPort sender = myIbis.createSendPort(replyPortType);
+			sender.connect(worker);
+			WriteMessage message = sender.newMessage();
+			message.writeObject(workerJobs);
+			message.finish();
+			sender.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}	
+
+	private void printResult()
+	{
+		System.out.println();
+		System.out.println("Solving cube possible in " + result + " ways of " + bound + " steps");
+
+		System.err.println("Solving cube took " + (end - start)	+ " milliseconds");
+	}   	
+
+	private static int solutions(Cube cube, CubeCache cache) {
+		if (cube.isSolved()) {
+			return 1;
+		}
+
+		if (cube.getTwists() >= cube.getBound()) {
+			return 0;
+		}
+		Cube[] children = cube.generateChildren(cache);
+
+		int result = 0;
+
+		for (Cube child : children) {
+			int childSolutions = solutions(child, cache);
+			if (childSolutions > 0) {
+				result += childSolutions;
+				if (PRINT_SOLUTION) {
+					child.print(System.err);
+				}
+			}cache.put(child);
+		}
+
+		return result;
+	}
+
+	private Object receiveJobs(){
+		Object obj = null;
+		try{
+			ReadMessage message = receivePort.receive();
+			obj = message.readObject();
+			message.finish();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} catch(ClassNotFoundException e) {
+			e.printStackTrace();
+		}
+		return obj;
+	}
+
+	private void requestJob(int result){		
+		SendPort sender;
+		try{
+			sender = myIbis.createSendPort(requestPortType);
+			sender.connect(master, "master");
+			WriteMessage message = sender.newMessage();
+			Map.Entry<ReceivePortIdentifier, Integer> mp = new  AbstractMap.SimpleEntry<ReceivePortIdentifier, Integer>(receivePort.identifier(),result);
+			message.writeObject(mp);
+			message.finish();
+			sender.close();
+		} catch(IOException e) {
+			e.printStackTrace();
+		}
+
+	}
+
+	public static void main (String args[]) { 
+
+		try {
+			new Rubiks(args);
+		} catch (Exception e) {
+			e.printStackTrace(System.err);
+		}
+	}
+}
+

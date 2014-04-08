@@ -1,0 +1,182 @@
+package poldercast.topics;
+
+import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Set;
+import java.util.Vector;
+import java.util.Map.Entry;
+
+import peernet.config.Configuration;
+import poldercast.util.Constants;
+
+
+public class TopicsRepository //implements Topics
+{
+ 
+  
+  private static HashMap<Long,Vector<Topics>> topicRepo = new HashMap<Long, Vector<Topics>>();//<nodeid, interests>
+  private static HashMap<Topics,Vector<Long>> subscribers = new HashMap<Topics, Vector<Long>>(); //<TopicId,subscribers>
+  
+  
+  public static void initTopics(String prefix)
+  {
+    String fileName = Configuration.getString(prefix + "." + Constants.PAR_FILE);
+    mapFileToRep(fileName);    
+  }
+  
+    
+  //@Override
+  public static Vector<Integer> getTopics(long nodeIndex)
+  {
+    return topicRepo.get(nodeIndex);
+  }
+
+
+  //@Override
+  public Integer getTopicPriority(int topicIndex)
+  {
+    // TODO Auto-generated method stub
+    return null;
+  }
+  
+  public static int getMaximNeighbors(int index)
+  {
+    int neighbbors = 0;
+    for (int i = 0; i< topicRepo.size(); i++)
+    {
+      if (i != index)
+      {
+        if (getCommonTopics(index, i) > 0)
+          neighbbors++;
+      }
+    }
+    return neighbbors;
+  }
+  
+  public static int getCommonTopics (long index1, long index2)
+  {
+    int commonTopics = 0;
+    for (int i = 0; i< topicRepo.get(index1).size(); i++)
+      if (topicRepo.get(index2).contains(topicRepo.get(index1).get(i)))
+        commonTopics++;
+    return commonTopics;
+  }
+  
+  
+  /**
+   * Reads text from a file line by line
+   */
+  private static void mapFileToRep(String filename) {
+      
+      BufferedReader bufferedReader = null;
+      Vector<Topics> nodeSubscriptionList;
+      
+     
+      try {
+          //Construct the BufferedReader object
+          System.out.println(filename);
+          bufferedReader = new BufferedReader(new FileReader(filename));
+          
+          String line = null;
+          long key= 0;
+          while ((line = bufferedReader.readLine()) != null) {
+              //Process the data, here we just print it out
+            nodeSubscriptionList = new Vector<Topics>();
+            String[] tokens = line.split(",");   
+            for (int i = 0; i < tokens.length; i++)
+            {
+              Topics t =  new Topics(Integer.parseInt(tokens[i]));
+              nodeSubscriptionList.add(t);
+              addSubscriber(t, key);
+            }
+            topicRepo.put(key, nodeSubscriptionList);
+            key++;
+          }
+          
+      } catch (FileNotFoundException ex) {
+          ex.printStackTrace();
+      } catch (IOException ex) {
+          ex.printStackTrace();
+      } finally {
+          //Close the BufferedReader
+          try {
+              if (bufferedReader != null)
+                  bufferedReader.close();
+          } catch (IOException ex) {
+              ex.printStackTrace();
+          }
+      }
+      //printSUbscribers();
+  }
+
+  /**
+   * 
+   * @param topic
+   * @param subscriber
+   */
+  private static void addSubscriber(Topics topic, long subscriber)
+  {
+    if (subscribers.containsKey(topic))
+      subscribers.get(topic).add(subscriber);
+    else
+    {
+      Vector<Long> v = new Vector<Long>();
+      v.add(subscriber);
+      subscribers.put(topic, v);
+    }
+  }  
+
+  /**
+   * @param topic
+   * @return
+   */
+  public static Vector<Long> getSubscribers(int topic)
+  {
+    return subscribers.get(topic);
+  }
+  
+  private static void addSubscriber(int topic, long subscriber)
+  {
+    if (subscribers.containsKey(topic))
+      subscribers.get(topic).add(subscriber);
+    else
+    {
+      Vector<Long> v = new Vector<Long>();
+      v.add(subscriber);
+      subscribers.put(topic, v);
+    }
+  }
+
+
+  /**
+   * @return
+   */
+  public static Vector<Integer> getAllTopics()
+  {
+    Vector<Integer> allTopics = new Vector<Integer>();
+    Set<Entry<Integer,Vector<Long>>> set = subscribers.entrySet();
+    Iterator<Entry<Integer, Vector<Long>>> it = set.iterator();
+    while (it.hasNext())
+      allTopics.add(it.next().getKey());
+    return allTopics;
+  }  
+  
+  public static void printSUbscribers()
+  {
+    Set<Entry<Integer,Vector<Long>>> set = subscribers.entrySet();
+    Iterator<Entry<Integer,Vector<Long>>> it = set.iterator();
+    while(it.hasNext())
+    {
+      Entry<Integer,Vector<Long>> entry = it.next();
+      System.out.print("< " + entry.getKey() + "> ");
+      for (int i = 0; i< entry.getValue().size(); i++)
+        System.out.print(entry.getValue().get(i) + " ");
+      System.out.println();
+    }
+  }
+  
+}

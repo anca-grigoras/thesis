@@ -1,0 +1,75 @@
+CV                       20
+CG                       5
+NODES                    1000
+CYCLE                    500
+
+
+engine.mode              sim
+engine.duration          CYCLE * 100
+random.seed              0
+network.size             NODES
+
+
+
+###################
+# GOSSIP PROTOCOL #
+###################
+
+include.protocol         cyclon
+
+protocol.cyclon          tera.protocols.Cyclon
+{
+  descriptor             tera.descriptor.DescriptorTopics
+  settings               tera.protocols.CyclonSettings
+
+  view                   CV
+  gossip                 CG
+
+  step                   CYCLE
+  randstart
+
+  transport              trans
+}
+
+
+
+transport.trans          peernet.transport.UniformRandomTransport
+{
+  mindelay               5
+  maxdelay               10
+}
+
+
+
+include.init             bootstrap
+
+init.bootstrap           peernet.dynamics.WireKOut
+{
+  protocol               cyclon
+  k                      4
+}
+
+
+
+###################
+#    OBSERVERS    #
+###################
+
+include.control          degree
+
+control.ball             peernet.reports.BallExpansion
+{
+  protocol               cyclon
+  n                      1
+}
+
+control.degree          peernet.reports.DegreeStats
+{
+  trace
+  #step                  10 * CYCLE
+  step                  CYCLE
+  protocol              cyclon
+  undir
+  #at                    1000
+  method                freq
+}

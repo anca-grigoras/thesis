@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Copy element &apos;NodeTopicsInitializer.java&apos; to &apos;PeerNetProtocols/src/poldercast.initializers&apos;&#x0A;- Original project: &apos;PeerEmuProtocols&apos;&#x0A;- Destination element: &apos;PeerNetProtocols/src/poldercast.initializers&apos;&#x0A;- Original element: &apos;poldercast.initializers.NodeTopicsInitializer.java&apos;" description="Copy compilation unit" destination="=PeerNetProtocols/src&lt;poldercast.initializers" element1="/src&lt;poldercast.initializers{NodeTopicsInitializer.java" files="0" flags="589830" folders="0" id="org.eclipse.jdt.ui.copy" policy="org.eclipse.jdt.ui.copyResources" stamp="1367269175095" units="1" version="1.0"/>
+</session>

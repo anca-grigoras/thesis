@@ -1,0 +1,118 @@
+/**
+ * 
+ */
+package poldercast.observers;
+
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map.Entry;
+import java.util.Set;
+
+import peernet.config.Configuration;
+import peernet.core.Control;
+import peernet.core.Network;
+import peernet.core.Node;
+import poldercast.protocols.Dissemination;
+import poldercast.topics.TopicEvent;
+
+/**
+ * @author anca
+ *
+ */
+public class Log implements Control
+{
+  int pid;
+  int cycle = 0;
+  int size = 0;
+  BufferedWriter writer;
+  /**
+   * 
+   */
+  public Log(String name)
+  {
+    pid = Configuration.getPid(name+"."+PAR_PROTOCOL);
+    size = Network.size();
+    
+    Charset charset = Charset.forName("US-ASCII");
+    String s = "# nodeId msgId topicId hops time";
+    Path file = Paths.get("log.txt");
+    
+    try 
+    {
+        writer = Files.newBufferedWriter(file, charset);
+        writer.write(s, 0, s.length());
+        writer.newLine();
+    } catch (IOException x) {
+        System.err.format("IOException: %s%n", x);
+    }
+  }
+
+
+
+  /* (non-Javadoc)
+   * @see peernet.core.Control#execute()
+   */
+  @Override
+  public boolean execute()
+  {
+    cycle++;
+    System.out.println(cycle);
+    logInfo();
+    return false;
+  }
+
+
+
+  /**
+   * @throws IOException 
+   * 
+   */
+  private void logInfo()
+  {
+    try
+    {
+      writer.write(cycle);
+      writer.newLine();
+    }
+    catch (IOException e)
+    {
+      e.printStackTrace();
+    }
+    
+    
+    for (int i = 0; i< size; i++)
+    {  
+      Node n = Network.get(i);
+      Dissemination dissem = (Dissemination)n.getProtocol(pid);
+      HashMap<TopicEvent,Long> myMsg = dissem.getMsgDigest();
+      Set<Entry<TopicEvent,Long>> set = myMsg.entrySet();
+      Iterator<Entry<TopicEvent,Long>> it = set.iterator();
+      while(it.hasNext())
+      {
+        Entry<TopicEvent,Long> entry = it.next();
+        String line = n.getID() + " " + 
+                      entry.getKey().getId() + " " +
+                      entry.getKey().getTopicOfInterest().getId() + " " +
+                      entry.getKey().getHop() + " " + 
+                      entry.getValue();
+        try
+        {
+          writer.write(line);
+          writer.newLine();
+        }
+        catch (IOException e)
+        {
+          e.printStackTrace();
+        }
+      }
+       dissem.resetMsgDigest();
+    }
+    
+  }
+}

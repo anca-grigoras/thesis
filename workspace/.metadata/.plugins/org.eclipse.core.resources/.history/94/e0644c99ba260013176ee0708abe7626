@@ -1,0 +1,45 @@
+/**
+ * 
+ */
+package tera.protocols;
+
+import peernet.core.Node;
+import peernet.transport.Address;
+
+/**
+ * @author anca
+ *
+ */
+public class SubscriptionManagement extends Gossip
+{
+ 
+
+  /**
+   * @param prefix
+   */
+  public SubscriptionManagement(String prefix)
+  {
+    super(prefix);
+    // TODO Auto-generated constructor stub
+  }
+
+  /* (non-Javadoc)
+   * @see peernet.core.Protocol#processEvent(peernet.transport.Address, peernet.core.Node, int, java.lang.Object)
+   */
+  @Override
+  public void processEvent(Address src, Node node, int pid, Object event)
+  {
+    // TODO Auto-generated method stub
+    
+  }
+
+  /* (non-Javadoc)
+   * @see peernet.core.Protocol#nextCycle(peernet.core.Node, int)
+   */
+  @Override
+  public void nextCycle(Node node, int protocolID)
+  {
+    // TODO Auto-generated method stub
+    
+  }
+}

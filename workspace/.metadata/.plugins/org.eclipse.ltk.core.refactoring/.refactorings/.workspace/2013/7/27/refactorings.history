@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Rename Java project &apos;PeerNetProtocols&apos; to &apos;PeerNetProtocolsAnca&apos;&#x0A;- Original element: &apos;PeerNetProtocols&apos;&#x0A;- Renamed element: &apos;PeerNetProtocols&apos;&#x0A;- Update references to refactored element" description="Rename Java project &apos;PeerNetProtocols&apos;" flags="7" id="org.eclipse.jdt.ui.rename.java.project" input="=PeerNetProtocols" name="PeerNetProtocolsAnca" references="true" stamp="1372781614969" version="1.0"/>
+</session>

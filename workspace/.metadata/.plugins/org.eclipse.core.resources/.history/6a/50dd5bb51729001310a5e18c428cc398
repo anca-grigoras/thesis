@@ -1,0 +1,322 @@
+/**
+ * 
+ */
+package poldercast.protocols;
+
+import java.util.HashMap;
+import java.util.Vector;
+
+import poldercast.topics.Topics;
+
+import peernet.core.CommonState;
+import peernet.core.Descriptor;
+import peernet.core.Node;
+import peernet.core.Protocol;
+import peernet.transport.Address;
+import poldercast.topics.RoutingTable;
+import poldercast.topics.TopicEvent;
+import poldercast.topics.TopicsRepository;
+
+/**
+ * @author anca
+ *
+ */
+public class Dissemination extends Protocol
+{
+  DisseminationSettings disSettings;
+  HashMap<Topics, Boolean> topicMessageFwd;
+  HashMap<Topics,Integer> msgHopCounter;
+  HashMap<Topics,Integer> duplicateMessages;
+  Vector<Long> msgIdContainer;
+  boolean isInitialized = false;
+  int fanout;
+  int consumption;
+  int received, forwarded;
+  int duplicates;
+  
+  /**
+   * @param prefix
+   */
+  public Dissemination(String prefix)
+  {
+    super(prefix);
+    disSettings = (DisseminationSettings)settings;
+    topicMessageFwd = new HashMap<Topics, Boolean>();
+    msgHopCounter = new HashMap<Topics, Integer>();
+    msgIdContainer = new Vector<Long>();
+    duplicateMessages = new HashMap<Topics, Integer>();
+    consumption = 0;
+    duplicates = 0;
+    received = 0; forwarded = 0;
+  }
+
+
+  /**
+   * 
+   * @param id
+   */
+  private void init(Long id)
+  {
+     Vector<Topics> topics = TopicsRepository.getTopics(id);
+     for (int i = 0; i< topics.size(); i++)
+     {
+       topicMessageFwd.put(topics.get(i), false);
+       msgHopCounter.put(topics.get(i), -1);
+     }
+     isInitialized = true;    
+  }
+
+
+  /* (non-Javadoc)
+   * @see peernet.core.Protocol#processEvent(peernet.transport.Address, peernet.core.Node, int, java.lang.Object)
+   */
+  @Override
+  public void processEvent(Address src, Node node, int pid, Object event)
+  {
+    if (!isInitialized)
+      init(node.getID());
+    
+    TopicEvent te = (TopicEvent)event;
+    Topics topic = te.getTopicOfInterest();
+    long msgId = te.getId();
+    if (msgIdContainer.contains(msgId))
+    {
+      duplicates++;
+      int count = 1;
+      if(duplicateMessages.get(topic) != null)
+      {
+        count = duplicateMessages.get(topic);
+        count++;
+      }
+      duplicateMessages.put(topic, count);
+      return;
+    }
+    consumption++; received++;
+    msgIdContainer.add(msgId);    
+    msgHopCounter.put(topic, te.getHop());
+    
+    /*if(topicMessageFwd.get(topic)) //the node received before a message for this topic
+      return;*/
+    //if (topicMessageFwd.get(topic)) System.out.println("I am already true");
+    topicMessageFwd.put(topic, true);
+    
+    Node sender = te.getSource();
+    TopicEvent newTe = (TopicEvent) te.clone();
+    //newTe.setSource(sender);
+    newTe.incHop();
+   
+    fanout = disSettings.fanout;
+    Rings rings = (Rings)node.getProtocol(disSettings.rtPid);
+    
+    disseminateEvent(sender, rings, topic, newTe, pid);
+    
+  }
+
+  /**
+   * @param sender 
+   * @param rings
+   * @param topic
+   * @param newTe
+   * @param pid 
+   * @param fanout 
+   */
+  private void disseminateEvent(Node sender, Rings rings, Topics topic, TopicEvent newTe, int pid)
+  {
+    RoutingTable rt = rings.getRingsNeighbors(topic);
+    if (rt == null)
+      return; //do I return or send just to random neighbors?
+    Vector<Long> selectedIds = new Vector<Long>();
+    sendEvent(rt.getPred(), sender.getID(), pid, newTe, selectedIds);//sends at most one pred
+    sendEvent(rt.getSucc(), sender.getID(), pid, newTe, selectedIds);//sends at most one succ
+    Vector<Descriptor> randomNeighbors = rings.getRandomNeighbors(node, pid, topic);
+    if (randomNeighbors.isEmpty())
+      return;
+    int remaining = fanout;
+    while (remaining > 0)
+    {
+      Descriptor randomDescr = chooseRandomNeighbor(randomNeighbors, selectedIds, sender.getID());
+      if (randomDescr == null) return;
+      selectedIds.add(randomDescr.getID());
+      remaining--;
+      consumption++; forwarded++;
+      send(randomDescr.address, pid, newTe);
+    }
+    
+  }
+
+
+  private void sendEvent(Vector<Descriptor> neighbors, long senderId, int pid, 
+      TopicEvent te, Vector<Long> selectedIds)
+  {
+    boolean isSent = false;
+    int i = 0;
+    while (!isSent)
+    {
+      Descriptor descr = null;
+      if (i < neighbors.size())
+        descr = neighbors.get(i);
+      i++;
+      if (descr == null)
+        return;
+      if(descr.getID() == senderId)
+        continue;
+      
+
+      selectedIds.add(descr.getID());
+      fanout--;
+      consumption++; forwarded++;
+      isSent = true;
+      send(descr.address, pid, te);        
+    }
+  }
+  
+  private Descriptor chooseRandomNeighbor(Vector<Descriptor> randomNeighbors, Vector<Long> selectedIds, long l)
+  {
+    Descriptor chosen = null;
+    boolean isChosen = false;
+    while (randomNeighbors.size() > 0 && !isChosen)
+    {
+      int index = CommonState.r.nextInt(randomNeighbors.size());
+      chosen = randomNeighbors.get(index);
+      if (!selectedIds.contains(chosen.getID()) && !(chosen.getID() == l))
+        isChosen = true;
+      else
+      {
+        randomNeighbors.remove(index);
+        chosen = null;
+      }
+        
+    }
+    return chosen;
+  }
+  
+  public void setEventState(Topics topic)
+  {
+    topicMessageFwd.put(topic, false);
+  }
+
+  /**
+   * @return the disSettings
+   */
+  public DisseminationSettings getDisSettings()
+  {
+    return disSettings;
+  }
+
+
+  /**
+   * @return the topicMessageFwd
+   */
+  public HashMap<Topics, Boolean> getTopicMessageFwd()
+  {
+    return topicMessageFwd;
+  }
+
+  public void resetHopCounter(Topics topic)
+  {
+    msgHopCounter.put(topic, -1);
+  }
+  
+  /**
+   * @return the msgHopCounter
+   */
+  public HashMap<Integer, Integer> getMsgHopCounter()
+  {
+    return msgHopCounter;
+  }
+
+
+  /**
+   * @return the duplicateMessages
+   */
+  public HashMap<Integer, Integer> getDuplicateMessages()
+  {
+    return duplicateMessages;
+  }
+
+  /**
+   * @return the consumption
+   */
+  public int getConsumption()
+  {
+    return consumption;
+  }
+
+  public void resetConsumption()
+  {
+    consumption = 0;
+  }
+  
+  /**
+   * @return the duplicates
+   */
+  public int getDuplicates()
+  {
+    return duplicates;
+  }
+  
+  public void resetDuplicates()
+  {
+    duplicates = 0;
+  }
+
+  public void resetDuplicateMessages()
+  {
+    duplicateMessages.clear();
+  }
+  
+  public int getReceived()
+  {
+    return received;
+  }
+  
+  public void resetReceived()
+  {
+    received = 0;
+  }
+  
+  public int getForwarded()
+  {
+    return forwarded;
+  }
+  
+  public void resetForwarded()
+  {
+    forwarded = 0;
+  }
+
+  /**
+   * @return the isInitialized
+   */
+  public boolean isInitialized()
+  {
+    return isInitialized;
+  }
+
+
+  /* (non-Javadoc)
+   * @see peernet.core.Protocol#nextCycle(peernet.core.Node, int)
+   */
+  @Override
+  public void nextCycle(Node node, int protocolID)
+  {
+    // TODO Auto-generated method stub
+  }
+  
+  
+  @Override
+  public Object clone()
+  {
+    Dissemination diss = null;
+    diss = (Dissemination) super.clone();
+    diss.msgHopCounter = new HashMap<Integer, Integer>();
+    diss.topicMessageFwd = new HashMap<Topics, Boolean>();
+    diss.msgIdContainer = new Vector<Long>();
+    diss.duplicateMessages = new HashMap<Integer, Integer>();
+    diss.consumption = 0;
+    diss.duplicates = 0;
+    diss.received = 0;
+    diss.forwarded = 0;
+    return diss;
+  }
+}

@@ -1,0 +1,87 @@
+/**
+ * 
+ */
+package tera.protocols;
+
+import java.util.Vector;
+
+import peernet.core.Descriptor;
+import peernet.core.Node;
+import poldercast.descriptor.DescriptorTopics;
+import poldercast.protocols.CyclonSettings;
+import poldercast.protocols.Message;
+
+/**
+ * @author anca
+ *
+ */
+public class Cyclon extends Gossip
+{
+  /**
+   * This variable holds all protocol-instance related variable,
+   * that have a fixed value for all view participating in an
+   * instance of a protocol, such as the view length or gossip length.
+   */
+  public CyclonSettings cyclonSettings;
+  
+  /*
+   * When a node initiates a gossip request, it sends some part of its view to
+   * the other peer. This part of the view is moved from 'view' to 'shippedView'
+   * and when a response is received, it is merged back to 'view', if there are
+   * available slots (e.g., in case of duplicates, or an initially non-full
+   * view).
+   * 
+   * So, this container is to be filled in nextCycle(), and "emptied" in
+   * processResponse().
+   */
+  Vector<Descriptor> shippedDescriptors= null;
+  /**
+   * @param prefix
+   */
+  public Cyclon(String prefix)
+  {
+    super(prefix);
+    cyclonSettings = (CyclonSettings)settings;
+    view = new Vector<Descriptor>(cyclonSettings.viewLen);
+  }
+  
+  /**
+   * Initiates gossip to a peer. Sends the initial message.
+   */
+  @SuppressWarnings("unchecked")
+  public void nextCycle(Node node, int pid)
+  {
+    Descriptor selfDescr = createDescriptor();
+    insertToView(shippedDescriptors, selfDescr);
+    // Increase the age of each item in my view by 1.
+    for (Descriptor d: view)
+      ((DescriptorTopics)d).incAge();
+
+    // If a node's view is empty, don't proceed
+    if ( (view.size() == 0) ||
+         (cyclonSettings.gossipLen == 0) )
+      return;
+
+    // First, select a peer to gossip with, and remove him from my view.
+    Descriptor peerDescr = selectToGossip();
+    view.remove(peerDescr);
+
+    // Select 'gossipLen'-1 neighbors to send to the other peer.
+    // Of course, exclude the peer itself.
+    Vector<Descriptor> descriptorsToSend = selectToSend(peerDescr, cyclonSettings.gossipLen-1);
+ // Store the list of sent descriptors to fill in empty slots when I receive
+    // a response, or to 
+    shippedDescriptors = (Vector<Descriptor>) descriptorsToSend.clone();
+
+    // Add my own descriptor to the list to send to the peer.
+    descriptorsToSend.add(selfDescr);
+
+    // Send the selected neighbors to this peer.
+    Message msg = new Message();
+    msg.type = Message.Type.GOSSIP_REQUEST;
+    msg.sender = selfDescr;
+    msg.descriptors = descriptorsToSend;
+//    System.err.println("Sending to "+peerDescr.address);
+    send(peerDescr.address, pid, msg);
+  }
+}

@@ -1,0 +1,72 @@
+package poldercast.protocols;
+
+import java.util.Vector;
+
+import peernet.core.Descriptor;
+import peernet.core.Node;
+import peernet.transport.Address;
+import peernet.transport.AddressSim;
+import poldercast.descriptor.DescriptorTopics;
+
+public class Rings extends Gossip
+{
+  RingsSettings ringsSettings;
+  public Rings(String prefix)
+  {
+    super(prefix);
+    ringsSettings = (RingsSettings)settings;
+
+    view = new Vector<Descriptor>(ringsSettings.viewLen);
+  }
+
+
+
+ 
+
+  @Override
+  public void processEvent(Address src, Node node, int pid, Object event)
+  {
+    Message msg = (Message) event;
+    msg.sender.address = src; // Set the sender's address
+    switch (msg.type)
+    {
+      case GOSSIP_REQUEST:
+        processGossipRequest(msg.sender, node, pid, msg.descriptors);
+        break;
+      case GOSSIP_RESPONSE:
+        processResponse(node, pid, msg.descriptors);
+    }    
+  }
+
+
+
+  private void processResponse(Node node, int pid, Vector<Descriptor> descriptors)
+  {
+    // TODO Auto-generated method stub
+    
+  }
+
+
+
+  private void processGossipRequest(Descriptor sender, Node node, int pid, Vector<Descriptor> descriptors)
+  {
+    // TODO Auto-generated method stub
+    
+  }
+
+
+
+  @Override
+  public void nextCycle(Node node, int protocolID)
+  {
+    Vector<Descriptor> neighborsFromAllProtocols;
+    // Acquire fresh own descriptor
+    Descriptor selfDescr = getOwnDescriptor();
+    ((AddressSim)selfDescr.address).node = node;
+       
+     //***************** STEP 1:  Increase the age field of every neighbor by one
+    //assert (selfDescr instanceof DescriptorAge): "Vicinity needs DescriptorAge descriptors, or their descendants.";
+    for (Descriptor d: view)
+      ((DescriptorTopics)d).incAge();
+  }
+}

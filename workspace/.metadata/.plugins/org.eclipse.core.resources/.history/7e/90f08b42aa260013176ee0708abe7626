@@ -1,0 +1,20 @@
+/**
+ * 
+ */
+package tera.protocols;
+
+/**
+ * @author anca
+ *
+ */
+public class Cyclon extends Gossip
+{
+  /**
+   * @param prefix
+   */
+  public Cyclon(String prefix)
+  {
+    super(prefix);
+    // TODO Auto-generated constructor stub
+  }
+}

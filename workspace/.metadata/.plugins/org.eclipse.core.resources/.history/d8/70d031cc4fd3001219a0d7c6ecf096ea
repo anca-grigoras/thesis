@@ -1,0 +1,21 @@
+/**
+ * 
+ */
+package vitis.protocols;
+
+/**
+ * @author anca
+ *
+ */
+public class Vitis extends Gossip
+{
+
+  /**
+   * @param prefix
+   */
+  public Vitis(String prefix)
+  {
+    super(prefix);
+    // TODO Auto-generated constructor stub
+  }
+}

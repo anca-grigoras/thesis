@@ -1,0 +1,108 @@
+/**
+ * 
+ */
+package tera.protocols;
+
+import peernet.core.Descriptor;
+import peernet.core.Linkable;
+import peernet.core.Node;
+import peernet.core.Protocol;
+import peernet.transport.Address;
+
+/**
+ * @author anca
+ *
+ */
+public class Gossip extends Protocol implements Linkable
+{
+  /**
+   * @param prefix
+   */
+  public Gossip(String prefix)
+  {
+    super(prefix);
+    // TODO Auto-generated constructor stub
+  }
+
+
+
+  /* (non-Javadoc)
+   * @see peernet.core.Protocol#processEvent(peernet.transport.Address, peernet.core.Node, int, java.lang.Object)
+   */
+  @Override
+  public void processEvent(Address src, Node node, int pid, Object event)
+  {
+    // TODO Auto-generated method stub
+  }
+
+
+
+  /* (non-Javadoc)
+   * @see peernet.core.Protocol#nextCycle(peernet.core.Node, int)
+   */
+  @Override
+  public void nextCycle(Node node, int protocolID)
+  {
+    // TODO Auto-generated method stub
+  }
+
+
+
+  /* (non-Javadoc)
+   * @see peernet.core.Cleanable#onKill()
+   */
+  @Override
+  public void onKill()
+  {
+    // TODO Auto-generated method stub
+    
+  }
+
+
+
+  /* (non-Javadoc)
+   * @see peernet.core.Linkable#degree()
+   */
+  @Override
+  public int degree()
+  {
+    // TODO Auto-generated method stub
+    return 0;
+  }
+
+
+
+  /* (non-Javadoc)
+   * @see peernet.core.Linkable#getNeighbor(int)
+   */
+  @Override
+  public Descriptor getNeighbor(int i)
+  {
+    // TODO Auto-generated method stub
+    return null;
+  }
+
+
+
+  /* (non-Javadoc)
+   * @see peernet.core.Linkable#addNeighbor(peernet.core.Descriptor)
+   */
+  @Override
+  public boolean addNeighbor(Descriptor neighbour)
+  {
+    // TODO Auto-generated method stub
+    return false;
+  }
+
+
+
+  /* (non-Javadoc)
+   * @see peernet.core.Linkable#contains(peernet.core.Descriptor)
+   */
+  @Override
+  public boolean contains(Descriptor neighbor)
+  {
+    // TODO Auto-generated method stub
+    return false;
+  }
+}

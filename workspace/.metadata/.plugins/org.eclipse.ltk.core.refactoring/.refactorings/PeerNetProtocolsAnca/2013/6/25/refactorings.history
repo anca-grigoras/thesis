@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Copy 2 elements to &apos;PeerNetProtocols/src/vitis.protocols&apos;&#x0A;- Original project: &apos;PeerNetProtocols&apos;&#x0A;- Destination element: &apos;PeerNetProtocols/src/vitis.protocols&apos;&#x0A;- Original elements:&#x0A;     poldercast.protocols.Cyclon.java&#x0A;     poldercast.protocols.CyclonSettings.java" description="Copy compilation units" destination="/src&lt;vitis.protocols" element1="/src&lt;poldercast.protocols{Cyclon.java" element2="/src&lt;poldercast.protocols{CyclonSettings.java" files="0" flags="589830" folders="0" id="org.eclipse.jdt.ui.copy" policy="org.eclipse.jdt.ui.copyResources" stamp="1371724295283" units="2" version="1.0"/>
+</session>

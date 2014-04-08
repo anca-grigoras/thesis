@@ -1,0 +1,19 @@
+/**
+ * 
+ */
+package tera.architecture;
+
+/**
+ * @author anca
+ *
+ */
+public class AccessPointsLookup
+{
+  /**
+   * 
+   */
+  public AccessPointsLookup()
+  {
+    // TODO Auto-generated constructor stub
+  }
+}

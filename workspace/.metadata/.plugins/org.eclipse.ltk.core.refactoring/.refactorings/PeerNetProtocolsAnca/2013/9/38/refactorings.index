@@ -1,0 +1,10 @@
+1379412003095	Rename field 'missedRatio'
+1379412048636	Rename type 'DegreeObserver'
+1379412089968	Rename type 'RingsLinks'
+1379412250309	Rename type 'RingsConvergence'
+1379436294429	Infer generic type arguments
+1379436310640	Infer generic type arguments
+1379436391746	Infer generic type arguments
+1379436844736	Infer generic type arguments
+1379436863967	Infer generic type arguments
+1379595384774	Rename local variable 'subscribers'

@@ -1,0 +1,60 @@
+/**
+ * 
+ */
+package vitis.newcast;
+
+import peernet.config.Configuration;
+import peernet.core.Node;
+import peernet.core.Protocol;
+import peernet.transport.Address;
+
+/**
+ * @author anca
+ *
+ */
+public class Newcast extends Protocol
+{
+  private static final String PAR_CACHE = "cache";
+
+  private static Node[] tn;
+  private static int[] ts;
+  private Node[] cache;
+  private int[] tstamps;
+  /**
+   * @param prefix
+   */
+  public Newcast(String prefix)
+  {
+    super(prefix);
+    final int cachesize = Configuration.getInt(prefix + "." + PAR_CACHE);
+    if (Newscast.tn == null || Newscast.tn.length < cachesize) {
+      Newscast.tn = new Node[cachesize];
+      Newscast.ts = new int[cachesize];
+    }
+  
+    cache = new Node[cachesize];
+    tstamps = new int[cachesize];
+  }
+
+
+
+  /* (non-Javadoc)
+   * @see peernet.core.Protocol#processEvent(peernet.transport.Address, peernet.core.Node, int, java.lang.Object)
+   */
+  @Override
+  public void processEvent(Address src, Node node, int pid, Object event)
+  {
+    // TODO Auto-generated method stub
+  }
+
+
+
+  /* (non-Javadoc)
+   * @see peernet.core.Protocol#nextCycle(peernet.core.Node, int)
+   */
+  @Override
+  public void nextCycle(Node node, int protocolID)
+  {
+    // TODO Auto-generated method stub
+  }
+}

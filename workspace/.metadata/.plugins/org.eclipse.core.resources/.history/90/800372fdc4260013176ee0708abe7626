@@ -1,0 +1,32 @@
+/**
+ * 
+ */
+package tera.protocols;
+
+import java.io.Serializable;
+import java.util.Map.Entry;
+import java.util.Vector;
+
+import peernet.core.Descriptor;
+import tera.protocols.Message.Type;
+
+/**
+ * @author anca
+ *
+ */
+public class Advertisment implements Serializable
+{
+  /**
+   * 
+   */
+  private static final long serialVersionUID = 1L;
+
+  public enum Type implements Serializable {
+    GOSSIP_REQUEST, GOSSIP_RESPONSE;
+  }
+
+  public Type type;
+  public Descriptor sender;
+  public Entry<Integer, Integer> entry;
+  public double sizeEstimation;
+}

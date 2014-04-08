@@ -1,0 +1,104 @@
+/**
+ * 
+ */
+package poldercast.topics;
+
+import peernet.core.Node;
+
+/**
+ * @author anca
+ *
+ */
+public class TopicEvent implements Cloneable
+{
+  private Node source;
+  private Topics topicOfInterest;
+  private int hop;
+  private String content;
+  public static int serialNumCounter = 0;
+  private long id;
+  
+  public TopicEvent(Node source, int topic, String content)
+  {
+    this.source = source;
+    topicOfInterest = topic;
+    this.content = content;
+    hop = 0;
+    id = serialNumCounter++;
+  }
+  
+  /**
+   * @return the sender
+   */
+  public Node getSource()
+  {
+    return source;
+  }
+
+  /**
+   * @param sender the sender to set
+   */
+  public void setSource(Node source)
+  {
+    this.source = source;
+  }
+
+  /**
+   * @return the topicOfInterest
+   */
+  public int getTopicOfInterest()
+  {
+    return topicOfInterest;
+  }
+  
+  /**
+   * @return the content
+   */
+  public String getContent()
+  {
+    return content;
+  }
+
+  /**
+   * @return the id
+   */
+  public long getId()
+  {
+    return id;
+  }
+
+  /**
+   * @param id the id to set
+   */
+  public void setId(int id)
+  {
+    this.id = id;
+  }
+
+  /**
+   * @return the hop
+   */
+  public int getHop()
+  {
+    return hop;
+  }
+
+  public void incHop()
+  {
+    hop++;
+  }
+
+  public Object clone()
+  {
+    Object obj = null;
+    try
+    {
+      obj = super.clone();
+    }
+    catch (CloneNotSupportedException e)
+    {
+      e.printStackTrace();
+    }
+    return obj;
+  }
+}

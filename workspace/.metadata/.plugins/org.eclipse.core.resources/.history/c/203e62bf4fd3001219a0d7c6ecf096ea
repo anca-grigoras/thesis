@@ -1,0 +1,12 @@
+/**
+ * 
+ */
+package vitis.protocols;
+
+/**
+ * @author anca
+ *
+ */
+public class VitisSettings
+{
+}

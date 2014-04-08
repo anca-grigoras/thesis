@@ -1,0 +1,23 @@
+package poldercast.protocols;
+
+import java.util.Comparator;
+
+import peernet.core.Descriptor;
+import peernet.core.ProtocolSettings;
+
+public class RingsSettings extends ProtocolSettings
+{
+//Protocol specific parameters
+ public int viewLen;
+ public int gossipLen;
+
+ public Comparator<Descriptor> duplCmp;
+
+  // Protocol specific parameters
+ boolean sendLinkableItems;
+  public RingsSettings(String prefix)
+  {
+    super(prefix);
+    // TODO Auto-generated constructor stub
+  }
+}

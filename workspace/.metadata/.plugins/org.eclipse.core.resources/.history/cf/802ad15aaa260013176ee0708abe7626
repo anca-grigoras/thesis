@@ -1,0 +1,28 @@
+/**
+ * 
+ */
+package tera.protocols;
+
+import poldercast.protocols.CyclonSettings;
+
+/**
+ * @author anca
+ *
+ */
+public class Cyclon extends Gossip
+{
+  /**
+   * This variable holds all protocol-instance related variable,
+   * that have a fixed value for all view participating in an
+   * instance of a protocol, such as the view length or gossip length.
+   */
+  public CyclonSettings cyclonSettings;
+  /**
+   * @param prefix
+   */
+  public Cyclon(String prefix)
+  {
+    super(prefix);
+    // TODO Auto-generated constructor stub
+  }
+}

@@ -1,0 +1,262 @@
+package poldercast.protocols;
+
+import java.util.Vector;
+
+import peernet.core.Descriptor;
+import peernet.core.Node;
+import peernet.transport.Address;
+import peernet.transport.AddressSim;
+import poldercast.descriptor.DescriptorTopics;
+
+public class Rings extends Gossip
+{
+  RingsSettings ringsSettings;
+  public Rings(String prefix)
+  {
+    super(prefix);
+    ringsSettings = (RingsSettings)settings;
+
+    view = new Vector<Descriptor>(ringsSettings.viewLen);
+  }
+
+  @Override 
+  public void nextCycle(Node node, int protocolID)
+  {
+    Vector<Descriptor> neighborsFromAllProtocols;
+    // Acquire fresh own descriptor
+    Descriptor selfDescr = getOwnDescriptor();
+    ((AddressSim)selfDescr.address).node = node;
+       
+     //***************** STEP 1:  Increase the age field of every neighbor by one
+    //assert (selfDescr instanceof DescriptorAge): "Vicinity needs DescriptorAge descriptors, or their descendants.";
+    for (Descriptor d: view)
+      ((DescriptorTopics)d).incAge();
+  
+    //COLLECT ALL NEIGHBORS (CYCLON, VICINITY, RINGS)
+    neighborsFromAllProtocols = collectAllNeighbors(node, selfDescr, protocolID, view, settings);
+    
+    //UPDATE VIEW
+    view = selectToKeep(ringsSettings.viewLen, selfDescr, neighborsFromAllProtocols, ((DescriptorTopics)selfDescr).getTopics());    
+    updateRoutingTable(selfDescr);
+    
+    Descriptor selectToGossip = selectPeer(view);
+    if (selectToGossip == null)
+      return;
+    view.remove(selectToGossip);
+    neighborsFromAllProtocols.remove(selectToGossip);
+    
+    Vector<Integer> commonTopics = getCommonTopics(selfDescr, selectToGossip);
+    Vector<Descriptor> subscribers = getSubscribersCommonTopics(neighborsFromAllProtocols, commonTopics);
+    Vector<Descriptor> neighborsToSend = selectToSend(ringsSettings.gossipLen, ringsSettings.viewLen, selectToGossip, subscribers, commonTopics,  null);
+    
+    Message msg = new Message();
+    msg.type = Message.Type.GOSSIP_REQUEST;
+    msg.sender = selfDescr;
+    msg.descriptors = neighborsToSend;
+    send(selectToGossip.address, protocolID, msg);
+    
+  }
+  
+  @Override
+  public void processEvent(Address src, Node node, int pid, Object event)
+  {
+    Message msg = (Message) event;
+    msg.sender.address = src; // Set the sender's address
+    switch (msg.type)
+    {
+      case GOSSIP_REQUEST:
+        processGossipRequest(msg.sender, node, pid, msg.descriptors);
+        break;
+      case GOSSIP_RESPONSE:
+        processResponse(node, pid, msg.descriptors);
+    }    
+  }
+  
+  private void processResponse(Node node, int pid, Vector<Descriptor> received)
+  {
+    Vector<Descriptor> neighborsFromAllProtocols;
+    Descriptor selfDescr = getOwnDescriptor();
+    ((AddressSim)selfDescr.address).node = node;
+
+    neighborsFromAllProtocols = collectAllNeighbors(node, selfDescr, pid, view, settings);
+    neighborsFromAllProtocols.addAll(received);
+    eliminateDuplicates(neighborsFromAllProtocols);
+   
+    view = selectToKeep(ringsSettings.viewLen, selfDescr, neighborsFromAllProtocols, ((DescriptorTopics)selfDescr).getTopics());
+    updateRoutingTable(selfDescr);
+    
+  }
+
+  private void processGossipRequest(Descriptor sender, Node node, int pid, Vector<Descriptor> received)
+  {
+    Descriptor selfDescr = getOwnDescriptor();
+    ((AddressSim)selfDescr.address).node = node;
+
+    Vector<Descriptor> neighborsFromAllProtocols = collectAllNeighbors(node, selfDescr, pid, view, settings);
+
+    ((DescriptorTopics)selfDescr).resetAge();
+    neighborsFromAllProtocols.add(selfDescr); //do we do this in rings?
+    
+    neighborsFromAllProtocols.remove(sender);//remove is not working. the descriptors are diff. use index.shouldn't we apply step 2 as well here???
+
+    Vector<Integer> commonTopics = getCommonTopics(selfDescr, sender);
+    Vector<Descriptor> subscribers = getSubscribersCommonTopics(neighborsFromAllProtocols, commonTopics);
+    Vector<Descriptor> neighborsToSend = selectToSend(ringsSettings.gossipLen,ringsSettings.viewLen, sender, subscribers, commonTopics, received);
+    
+    neighborsFromAllProtocols.remove(selfDescr);//i should not be in my own view
+    //should i increase the age?????
+    neighborsFromAllProtocols.addAll(received);
+    eliminateDuplicates(neighborsFromAllProtocols);
+    view = selectToKeep(ringsSettings.viewLen, selfDescr, neighborsFromAllProtocols, ((DescriptorTopics)selfDescr).getTopics());
+    updateRoutingTable(selfDescr);
+
+    Message msg = new Message();
+    msg.type = Message.Type.GOSSIP_RESPONSE;
+    msg.sender = selfDescr;
+    msg.descriptors = neighborsToSend;
+    send(sender.address, pid, msg);
+    
+  }  
+  
+  /**
+   * Returns all the subscribers that are subscribed to the common topics between the two descriptors
+   * @param selfDescr
+   * @param selectToGossip
+   * @param subscribers
+   * @return
+   */
+  private Vector<Descriptor> getSubscribersCommonTopics(Vector<Descriptor> subscribers, Vector<Integer> commonTopics)
+  {    
+    Vector<Descriptor> bestSubscribers = new Vector<Descriptor>();
+    for (Descriptor d : subscribers)
+    {
+      if (((DescriptorTopics)d).isSubscribed(commonTopics))
+        bestSubscribers.add(d);
+    }
+    
+    //sort subscribers by their ID
+    Descriptor temp;
+    for (int i = 0; i< bestSubscribers.size()-1; i++)
+      for (int j = i+1; j< bestSubscribers.size(); j++)
+        if ( ((DescriptorTopics)bestSubscribers.get(i)).getID() > ((DescriptorTopics)bestSubscribers.get(j)).getID() )
+        {
+          temp = bestSubscribers.get(j);
+          bestSubscribers.remove(j);
+          bestSubscribers.add(i, temp);
+        }
+     
+    return bestSubscribers;
+  }
+  
+  private Vector<Integer> getCommonTopics(Descriptor selfDescr, Descriptor selectToGossip)
+  {
+    Vector<Integer> topics1 = ((DescriptorTopics)selfDescr).getTopics();
+    Vector<Integer> topics2 = ((DescriptorTopics)selectToGossip).getTopics();
+    Vector<Integer> commonTopics = new Vector<Integer>();
+    
+    //get the common topics
+    for (int i = 0; i< topics1.size(); i++)
+      for (int j = 0; j< topics2.size(); j++)
+        if (topics1.get(i) == topics2.get(j))
+          commonTopics.add(topics1.get(i));
+    return commonTopics;
+  }
+  
+  private Vector<Descriptor> selectToKeep(int ringLinks, Descriptor descr, Vector<Descriptor> subscribers, Vector<Integer> topics)
+  {    
+    //?????????? DO WE ACTUALLY HAVE A BOUND FOR VIEW???
+    Vector<Descriptor> relevantNeighbors = selectProximalNeighbors(Integer.MAX_VALUE, ringLinks, descr, subscribers, topics, null);
+    return relevantNeighbors;
+  }
+  
+  /**
+   * 
+   * @param gossipLen
+   * @param gossipChoice
+   * @param neighbors
+   * @param exclude
+   * @return
+   */
+   private Vector<Descriptor> selectToSend(int gossipLen, int ringLinks, Descriptor gossipChoice, Vector<Descriptor> subscribers, Vector<Integer> commonTopics, Vector<Descriptor> exclude)
+   {    
+     //int index = ((AddressSim)gossipChoice.address).getNode().getIndex();
+     return selectProximalNeighbors(gossipLen, ringLinks, gossipChoice, subscribers, commonTopics,exclude);
+   }
+  
+  private Vector<Descriptor> selectProximalNeighbors(int size, int ringLinks, Descriptor descr, Vector<Descriptor> subscribers, Vector<Integer> topics, Vector<Descriptor> exclude)
+  {    
+    boolean nodeExcluded = false;
+    Vector<Descriptor> toReturn = new Vector<Descriptor>();
+    Vector<Descriptor> tmp = new Vector<Descriptor>();
+    
+    int low = 0, high = 0;
+    for(int topic: topics)
+    {
+      low = 0; high = 0;
+      tmp.clear();
+      for (Descriptor d: subscribers)
+      {
+          if (exclude != null)
+            nodeExcluded = isExcluded(d, exclude);
+          if (!nodeExcluded && !((DescriptorTopics)descr).isEqual(d))
+          {
+            if (((DescriptorTopics)d).isSubscribed(topic))
+              if (((DescriptorTopics)d).getID() < ((DescriptorTopics)descr).getID())
+                if (low == ringLinks/2)
+                {
+                  tmp.remove(0);
+                  tmp.add(d);
+                }
+                else{
+                  tmp.add(d);
+                  low++;
+                }
+              else
+                if (high == ringLinks/2)
+                {
+                  tmp.remove(tmp.size()-1);
+                  tmp.add(d);
+                }
+                else
+                {
+                  tmp.add(d);
+                  high++;
+                }
+          }
+      }
+      toReturn.addAll(tmp);
+    }
+    eliminateDuplicates(toReturn);
+    if (toReturn.size() > size)
+      for (int i = size; i< toReturn.size(); i++)
+        toReturn.remove(i);
+    return toReturn;
+  }
+  
+  private void updateRoutingTable(Descriptor descr)
+  {
+    int inc;
+    for (int topic: ((DescriptorTopics)descr).getTopics() )
+    {
+      inc = 0;
+      for (Descriptor d : view)
+        if ( ((DescriptorTopics)d).isSubscribed(topic) )
+          inc ++;
+      ((DescriptorTopics)descr).addSubscription(topic, inc);
+    }
+  }
+  
+  @Override
+  public boolean addNeighbor(Descriptor neighbour)
+  {
+    if (contains(neighbour))
+      return false;
+
+    if (view.size() >= ringsSettings.viewLen)
+      throw new IndexOutOfBoundsException();
+
+    view.add(neighbour);
+    return true;
+  } 
+  
+}

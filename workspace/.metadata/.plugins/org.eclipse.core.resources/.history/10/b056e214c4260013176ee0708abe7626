@@ -1,0 +1,19 @@
+/**
+ * 
+ */
+package tera.protocols;
+
+/**
+ * @author anca
+ *
+ */
+public class Advertisment
+{
+  /**
+   * 
+   */
+  public Advertisment()
+  {
+    // TODO Auto-generated constructor stub
+  }
+}

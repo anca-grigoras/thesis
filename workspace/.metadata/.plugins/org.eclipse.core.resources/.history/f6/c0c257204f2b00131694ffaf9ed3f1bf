@@ -1,0 +1,118 @@
+/**
+ * 
+ */
+package poldercast.observers;
+
+import java.util.HashMap;
+import java.util.Vector;
+
+import peernet.config.Configuration;
+import peernet.core.Control;
+import peernet.core.Network;
+import peernet.core.Node;
+import poldercast.protocols.Dissemination;
+import poldercast.topics.Topics;
+import poldercast.topics.TopicsRepository;
+
+/**
+ * @author anca
+ * We compute dissemination speed in number of hops required for a publication to reach the subscribers
+ */
+public class DisseminationSpeed implements Control
+{
+  int pid;
+  int cycle = 0;
+  int size = 0;
+  Vector<Topics> topics = null;  
+  /**
+   * 
+   */
+  public DisseminationSpeed(String name)
+  {
+    pid = Configuration.getPid(name+"."+PAR_PROTOCOL);
+    
+    topics = TopicsRepository.getAllTopics(); 
+    size = topics.size();
+  }
+
+
+
+  /* (non-Javadoc)
+   * @see peernet.core.Control#execute()
+   */
+  @Override
+  public boolean execute()
+  {
+    cycle++;
+    computeDisseminationSpeed();
+    
+    return false;
+  }
+
+
+
+  /**
+   * 
+   */
+  private void computeDisseminationSpeed()
+  {
+    int minHops = Integer.MAX_VALUE, maxHops = 0;
+    Vector<Integer> avgHops = new Vector<Integer>();
+    for (Topics topic : topics)
+    {
+      //minHops = Integer.MAX_VALUE; maxHops = 0;
+      Vector<Long> subscribers = TopicsRepository.getSubscribers(topic);
+      for (long subscr : subscribers)
+      {
+        Node n = Network.getByID((int) subscr);
+        Dissemination dissem = (Dissemination)n.getProtocol(pid);
+        int myHops = -1;
+        if (dissem.getMsgHopCounter().get(topic) != null)
+          myHops = dissem.getMsgHopCounter().get(topic);
+        if (myHops > 0)
+        {
+              dissem.resetHopCounter(topic);
+              if (myHops < minHops) minHops = myHops;
+              if (myHops > maxHops) maxHops = myHops;
+              avgHops.add(myHops);
+        }
+        dissem.resetHopCounter(topic);
+      }
+    }
+   
+    double avgTotalHops = computeMean(avgHops);
+    /*if (nodesPerHopes.get(avgTotalHops) != null)
+      nodesPerHopes.put(avgTotalHops, nodesPerHopes.get(avgTotalHops)+1);
+    else
+      nodesPerHopes.put(avgTotalHops, 1);*/
+    System.out.println(cycle + "\t" + avgTotalHops + "\t" + minHops + "\t" + maxHops); 
+    /*System.out.print(cycle + "\t");
+    Set<Entry<Double,Integer>> set = nodesPerHopes.entrySet();
+    Iterator<Entry<Double,Integer>> it = set.iterator();
+    while (it.hasNext())
+    {
+      Entry<Double,Integer> entry = it.next();
+      System.out.print("<" + entry.getKey() + ", " + entry.getValue() + ">\t");
+    }
+    System.out.println();*/
+  }
+
+
+
+  /**
+   * @param avgHops
+   * @return
+   */
+  private double computeMean(Vector<Integer> list)
+  {
+    int lenght = list.size();
+    if (lenght == 0)
+      return 0;
+    int sum = 0;
+    for (int i = 0; i < lenght; i++) {
+      sum = sum + ((Integer) list.get(i)).intValue();
+    }
+    double mean = sum / lenght;
+    return mean;
+  }
+}

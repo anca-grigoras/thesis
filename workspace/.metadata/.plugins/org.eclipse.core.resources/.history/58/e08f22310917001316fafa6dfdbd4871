@@ -1,0 +1,95 @@
+/**
+ * 
+ */
+package magnet.initializers;
+
+import java.math.BigInteger;
+import java.util.Vector;
+
+import chord.protocol.ChordControlProtocol;
+
+import magnet.descriptor.DescriptorTopics;
+import magnet.topics.Topic;
+import peernet.config.Configuration;
+import peernet.core.Control;
+import peernet.core.Descriptor;
+import peernet.core.Network;
+import peernet.core.Node;
+import util.Constants;
+import magnet.topics.TopicsRepository;
+
+/**
+ * @author anca
+ *
+ */
+public class NodeTopicsInitializer implements Control
+{
+  int pid = 0;
+  String confProperty = null;
+  int limit = 0;
+  /**
+   * 
+   */
+  public NodeTopicsInitializer(String prefix)
+  {
+    pid = Configuration.getPid(prefix + "." + Constants.PAR_PROT);
+    confProperty = prefix + "." + Constants.PAR_DATA;
+  }
+
+
+
+  /* (non-Javadoc)
+   * @see peernet.core.Control#execute()
+   */
+  @Override
+  public boolean execute()
+  {
+    if (Configuration.contains(confProperty))
+      TopicsRepository.initTopics(confProperty);
+    //int size = Network.size();
+    for (Topic t : TopicsRepository.getAllTopics())
+    {
+      BigInteger hashId = t.getHashId();
+      //Node sender = Network.get(CommonState.r.nextInt(size));
+      //Descriptor start = new Descriptor(sender, pid); 
+      /*LookupHomeLocMessage lhm = new LookupHomeLocMessage(sender, hashId);
+      sender.getTransportByPid(pid).send(sender, start.address, pid, lhm);*/
+      t.setHomeLocation(getHomeLocation(hashId, t)); // not ok. it should be a lookup message
+      System.out.println(t.getId() + "  " + t.getHomeLocation());
+    }
+    return false;
+  }
+  
+  private long getHomeLocation(BigInteger hashId, Topic t)
+  {
+    long minDist = Long.MAX_VALUE;
+    long id = -1;
+    int tid = t.getId();
+    for (int i = 0; i< Network.size(); i++)
+    {
+      Node n = Network.get(i);
+      long nid = n.getID();
+    //  ChordControlProtocol cp = (ChordControlProtocol) n.getProtocol(pid);
+      Vector<Topic> myTopics = TopicsRepository.getTopics(nid);
+     // Descriptor d = cp.createDescriptor();
+      if (!((DescriptorTopics)d).isSubscribedTo(t.getId()))
+        continue;
+      /*BigInteger chordId = cp.chordId;
+      BigInteger dist = hashId.subtract(chordId);
+      dist.abs();
+      if (minDist == null || dist.compareTo(minDist) == -1)
+      {
+        minDist = dist;
+        id = n.getID();
+      }*/
+      
+      long dist = Math.abs(nid-tid);
+      if (dist < minDist)
+      {
+        minDist = dist;
+        id = nid;
+      }
+    }
+    return id;
+  }
+}

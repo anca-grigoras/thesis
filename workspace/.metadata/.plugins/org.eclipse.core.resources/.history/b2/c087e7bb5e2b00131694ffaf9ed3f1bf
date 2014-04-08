@@ -1,0 +1,77 @@
+CC                       20
+CG                       5
+NODES                    50
+CYCLE                    1000
+
+PORT                     14000
+BOOTSTRAP_PORT           11000
+
+engine.mode              net
+engine.duration          CYCLE * 100
+random.seed              0
+network.size             NODES
+
+
+
+###################
+# GOSSIP PROTOCOL #
+###################
+
+include.protocol         cyclon
+
+protocol.cyclon          gossip.protocol.Cyclon
+{
+  descriptor             gossip.descriptor.DescriptorAge
+  settings               gossip.protocol.CyclonSettings
+
+  view                   CC
+  gossip                 CG
+
+  step                   CYCLE
+  randstart
+
+  transport              udp
+}
+
+
+
+transport.udp            peernet.transport.TransportUDP
+{
+  port                   PORT
+}
+
+
+
+include.init             wire
+
+init.wire                peernet.dynamics.BootstrapClient
+{
+  coordinator            kout
+  protocol               cyclon
+  host                   localhost
+  port                   BOOTSTRAP_PORT
+}
+
+###################
+#    OBSERVERS    #
+###################
+
+include.control          
+
+control.ball             peernet.reports.BallExpansion
+{
+  protocol               cyclon
+  n                      1
+}
+
+control.degree          peernet.reports.DegreeStats
+{
+  trace
+  #step                  10 * CYCLE
+  step                  CYCLE
+  protocol              cyclon
+  undir
+  #at                    1000
+  method                freq
+}
+

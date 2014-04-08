@@ -1,0 +1,191 @@
+package poldercast.protocols;
+
+import java.util.Vector;
+
+import peernet.core.Descriptor;
+import peernet.core.Linkable;
+import peernet.core.Node;
+import peernet.transport.Address;
+import peernet.transport.AddressSim;
+import poldercast.descriptor.DescriptorTopics;
+
+public class Rings extends Gossip
+{
+  RingsSettings ringsSettings;
+  public Rings(String prefix)
+  {
+    super(prefix);
+    ringsSettings = (RingsSettings)settings;
+
+    view = new Vector<Descriptor>(ringsSettings.viewLen);
+  }
+
+  @Override
+  public void nextCycle(Node node, int protocolID)
+  {
+    Vector<Descriptor> neighborsFromAllProtocols;
+    // Acquire fresh own descriptor
+    Descriptor selfDescr = getOwnDescriptor();
+    ((AddressSim)selfDescr.address).node = node;
+       
+     //***************** STEP 1:  Increase the age field of every neighbor by one
+    //assert (selfDescr instanceof DescriptorAge): "Vicinity needs DescriptorAge descriptors, or their descendants.";
+    for (Descriptor d: view)
+      ((DescriptorTopics)d).incAge();
+    
+    //COLLECT ALL NEIGHBORS (CYCLON, VICINITY, RINGS)
+    neighborsFromAllProtocols = collectAllNeighbors(node, selfDescr, protocolID);
+    
+    Descriptor selectToGossip = selectPeer();
+  }
+  
+  @Override
+  public void processEvent(Address src, Node node, int pid, Object event)
+  {
+    Message msg = (Message) event;
+    msg.sender.address = src; // Set the sender's address
+    switch (msg.type)
+    {
+      case GOSSIP_REQUEST:
+        processGossipRequest(msg.sender, node, pid, msg.descriptors);
+        break;
+      case GOSSIP_RESPONSE:
+        processResponse(node, pid, msg.descriptors);
+    }    
+  }
+  
+  private void processResponse(Node node, int pid, Vector<Descriptor> descriptors)
+  {
+    // TODO Auto-generated method stub
+    
+  }
+
+
+
+  private void processGossipRequest(Descriptor sender, Node node, int pid, Vector<Descriptor> descriptors)
+  {
+    // TODO Auto-generated method stub
+    
+  }
+  
+  /**
+   * 
+   * @return
+   */
+  private Descriptor selectPeer()
+  {
+    DescriptorTopics maxAgeDescr = null;
+
+    for (Descriptor d: view)
+      if (maxAgeDescr==null || ((DescriptorTopics) d).getAge() > maxAgeDescr.getAge())
+        maxAgeDescr = (DescriptorTopics) d;
+
+    return maxAgeDescr;
+  }
+  
+  /**
+   * Puts together all neighbors of this protocol and all linked protocols.
+   * Descriptors are NOT necessarily cloned. The idea is that preparing a
+   * collection of all neighbors should be fast, and cloning should be mandatory
+   * when selecting out of these neighbors either to feed my view, or to send
+   * to my peer.
+   * 
+   * @param selfNode
+   * @param selfDescr
+   * @param pid
+   * @return Returned descriptors are NOT guaranteed to be cloned.
+   */
+  protected Vector<Descriptor> collectAllNeighbors(Node selfNode, Descriptor selfDescr, int pid)
+  {
+    // If no protocols are linked, return the view, as is.
+    if (!settings.hasLinkable())
+      return view;
+
+    Vector<Descriptor> neighborsFromAllProtocols = new Vector<Descriptor>();
+
+    // First collect my own neighbors (not cloned)
+    for (Descriptor d: view)
+      neighborsFromAllProtocols.add(d);
+
+    // Then collect neighbors from linked protocols
+    for (int i=0; i<settings.numLinkables(); i++)
+    {
+      int linkableID = settings.getLinkable(i);
+      Linkable linkable = (Linkable) selfNode.getProtocol(linkableID);
+      // Add linked protocol's neighbors
+      for (int j = 0; j<linkable.degree(); j++)
+      {
+        // We have to clone it, to change its age without affecting Cyclon.
+        Descriptor descr = (Descriptor) linkable.getNeighbor(j);
+        Descriptor d = null;
+        try 
+        {
+          d = (Descriptor) descr.clone();
+        }
+        catch (CloneNotSupportedException e) {e.printStackTrace();}
+
+        ((DescriptorTopics) d).resetAge(); // Since Vicinity uses age in a different context, reset it.
+        neighborsFromAllProtocols.add(d);
+      }
+    }
+    eliminateDuplicates(neighborsFromAllProtocols);
+    return neighborsFromAllProtocols;
+  }
+  
+  private void eliminateDuplicates(Vector<Descriptor> descriptors)
+  {
+    int i = 0, j = 0;
+    boolean isRemoved = false;
+    while (i < descriptors.size()-1)
+    {
+     j = i+1;
+      isRemoved = false;
+      while (j < descriptors.size())
+      {
+        if (((DescriptorTopics)descriptors.get(i)).isEqual((DescriptorTopics)descriptors.get(j)))
+          if (resolveDuplicate(descriptors.get(i), descriptors.get(j)) < 0)
+          {
+            descriptors.remove(j);
+            j--;
+          }else{
+            descriptors.remove(i);
+            isRemoved = true;
+            continue;
+          }
+        j++;
+      }
+      if (!isRemoved)
+        i++;
+    }
+  }    
+
+  protected int resolveDuplicate(Descriptor a, Descriptor b)
+  {  
+    return ((DescriptorTopics)a).getAge()-((DescriptorTopics)b).getAge();
+  }
+  
+  private boolean isExcluded(Descriptor descr, Vector<Descriptor> descriptors)
+  {
+    for (int i = 0; i< descriptors.size(); i++)
+    {
+      if (((DescriptorTopics)descr).isEqual(descriptors.get(i)))
+        return true;
+    }
+    return false;
+  }
+
+
+  @Override
+  public boolean addNeighbor(Descriptor neighbour)
+  {
+    if (contains(neighbour))
+      return false;
+
+    if (view.size() >= ringsSettings.viewLen)
+      throw new IndexOutOfBoundsException();
+
+    view.add(neighbour);
+    return true;
+  } 
+  
+}

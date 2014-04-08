@@ -1,0 +1,22 @@
+/**
+ * 
+ */
+package tera.protocols;
+
+import peernet.core.ProtocolSettings;
+
+/**
+ * @author anca
+ *
+ */
+public class CyclonSettings extends ProtocolSettings
+{
+  /**
+   * @param prefix
+   */
+  public CyclonSettings(String prefix)
+  {
+    super(prefix);
+    // TODO Auto-generated constructor stub
+  }
+}

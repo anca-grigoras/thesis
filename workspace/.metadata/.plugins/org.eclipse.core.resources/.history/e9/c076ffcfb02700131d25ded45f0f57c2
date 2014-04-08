@@ -1,0 +1,96 @@
+/**
+ * 
+ */
+package vitis.newscast;
+
+import peernet.config.Configuration;
+import peernet.core.Node;
+import peernet.core.Protocol;
+import peernet.transport.Address;
+
+/**
+ * @author anca
+ *
+ */
+public class Newscast extends Protocol
+{
+  private static final String PAR_CACHE = "cache";
+
+  private static Node[] tn;
+  private static int[] ts;
+  private Node[] cache;
+  private int[] tstamps;
+  /**
+   * @param prefix
+   */
+  public Newscast(String prefix)
+  {
+    super(prefix);
+    final int cachesize = Configuration.getInt(prefix + "." + PAR_CACHE);
+    if (Newscast.tn == null || Newscast.tn.length < cachesize) {
+      Newscast.tn = new Node[cachesize];
+      Newscast.ts = new int[cachesize];
+    }
+  
+    cache = new Node[cachesize];
+    tstamps = new int[cachesize];
+  }
+
+
+
+  /* (non-Javadoc)
+   * @see peernet.core.Protocol#processEvent(peernet.transport.Address, peernet.core.Node, int, java.lang.Object)
+   */
+  @Override
+  public void processEvent(Address src, Node node, int pid, Object event)
+  {
+    // TODO Auto-generated method stub
+  }
+
+
+
+  /* (non-Javadoc)
+   * @see peernet.core.Protocol#nextCycle(peernet.core.Node, int)
+   */
+  @Override
+  public void nextCycle(Node node, int protocolID)
+  {
+    // TODO Auto-generated method stub
+  }
+  
+  private Node getPeer() {
+
+    final int d = degree();
+    if (d == 0)
+      return null;
+    int index = CommonState.r.nextInt(d);
+    Node result = cache[index];
+  
+    if (result.isUp())
+      return result;
+  
+    // proceed towards older entries
+    for (int i = index + 1; i < d; ++i)
+      if (cache[i].isUp())
+        return cache[i];
+  
+    // proceed towards younger entries
+    for (int i = index - 1; i >= 0; --i)
+      if (cache[i].isUp())
+        return cache[i];
+  
+    // no accessible peer
+    return null;
+  }
+  
+  public Object clone() {
+    
+    Newscast sn = null;
+    sn = (Newscast) super.clone();
+    sn.cache = new Node[cache.length];
+    sn.tstamps = new int[tstamps.length];
+    System.arraycopy(cache, 0, sn.cache, 0, cache.length);
+    System.arraycopy(tstamps, 0, sn.tstamps, 0, tstamps.length);
+    return sn;
+  }
+}

@@ -1,0 +1,33 @@
+/**
+ * 
+ */
+package tera.protocols;
+
+import peernet.config.Configuration;
+import peernet.core.Protocol;
+import peernet.core.ProtocolSettings;
+import poldercast.util.Constants;
+
+/**
+ * @author anca
+ *
+ */
+public class Tera extends ProtocolSettings
+{
+  private static final String PAR_GOSSIPLEN = "d";
+  public int gossipLen;
+  /**
+   * @param prefix
+   */
+  public Tera(String prefix)
+  {
+    super(prefix);
+    prefix = prefix.replace("."+Protocol.PAR_SETTINGS, "");
+    /**
+     * Default value is -1, so that the check "if (gossipLen==0)" doesn't block
+     * a generalized nextCycle() for protocol instances for which this parameter
+     * is irrelevant (like in VicinityCoverage).
+     */
+    gossipLen = Configuration.getInt(prefix+"."+Constants.PAR_GOSSIPLEN, -1);
+  }
+}

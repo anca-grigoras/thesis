@@ -1,0 +1,23 @@
+/**
+ * 
+ */
+package tera.protocols;
+
+import peernet.core.ProtocolSettings;
+
+/**
+ * @author anca
+ *
+ */
+public class SubscriptionManagementSettings extends ProtocolSettings
+{
+  private static final String PAR_D = "d";
+  /**
+   * @param prefix
+   */
+  public SubscriptionManagementSettings(String prefix)
+  {
+    super(prefix);
+    // TODO Auto-generated constructor stub
+  }
+}

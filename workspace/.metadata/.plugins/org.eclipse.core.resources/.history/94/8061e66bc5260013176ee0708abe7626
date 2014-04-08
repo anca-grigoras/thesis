@@ -1,0 +1,142 @@
+/**
+ * 
+ */
+package tera.protocols;
+
+import java.util.Iterator;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.Vector;
+
+import peernet.core.Descriptor;
+import peernet.core.Linkable;
+import peernet.core.Node;
+import peernet.transport.Address;
+import tera.descriptor.DescriptorTopics;
+
+/**
+ * @author anca
+ *
+ */
+public class SubscriptionManagement extends Gossip
+{
+  SubscriptionManagementSettings sms;
+
+  /**
+   * @param prefix
+   */
+  public SubscriptionManagement(String prefix)
+  {
+    super(prefix);
+    sms = (SubscriptionManagementSettings)settings;
+  }
+
+  /* (non-Javadoc)
+   * @see peernet.core.Protocol#processEvent(peernet.transport.Address, peernet.core.Node, int, java.lang.Object)
+   */
+  @Override
+  public void processEvent(Address src, Node node, int pid, Object event)
+  {
+    // TODO Auto-generated method stub
+    
+  }
+
+  /* (non-Javadoc)
+   * @see peernet.core.Protocol#nextCycle(peernet.core.Node, int)
+   */
+  @Override
+  public void nextCycle(Node node, int protocolID)
+  {
+    Descriptor selfDescr = createDescriptor();
+    
+    Vector<Descriptor> neighborsFromAllProtocols = collectAllNeighbors(node, selfDescr, protocolID);
+    Vector<Descriptor> toSend = selectToSend(neighborsFromAllProtocols, subscription)
+    
+    for(Descriptor d : neighborsFromAllProtocols)
+    {
+      Set<Entry<Integer,Integer>> set = ((DescriptorTopics)d).getSt().entrySet();
+      Iterator<Entry<Integer, Integer>> it = set.iterator();
+      while (it.hasNext())
+      {
+        Entry<Integer, Integer> entry = it.next();
+        double sizeEstimation = 0; //obtain the size estimation of the overlay
+        Advertisment adv = new Advertisment();
+        adv.type = Advertisment.Type.ADV_REQUEST;
+        adv.sender = selfDescr;
+        adv.entry = entry;        
+        adv.sizeEstimation = sizeEstimation;
+      }
+    }
+  }
+
+  /**
+   * @param node
+   * @param selfDescr
+   * @param protocolID
+   * @return
+   */
+  private Vector<Descriptor> collectAllNeighbors(Node selfNode, Descriptor selfDescr, int protocolID)
+  {
+ // If no protocols are linked, return the view, as is.
+    if (!settings.hasLinkable())
+      return view;
+
+    Vector<Descriptor> neighborsFromAllProtocols = new Vector<Descriptor>();
+
+    // First collect my own neighbors (not cloned)
+    for (Descriptor d: view)
+      neighborsFromAllProtocols.add(d);
+
+    // Then collect neighbors from linked protocols
+    for (int i=0; i<settings.numLinkables(); i++)
+    {
+      int linkableID = settings.getLinkable(i);
+      Linkable linkable = (Linkable) selfNode.getProtocol(linkableID);
+      // Add linked protocol's neighbors
+      for (int j = 0; j<linkable.degree(); j++)
+      {
+        // We have to clone it, to change its age without affecting Cyclon.
+        Descriptor descr = (Descriptor) linkable.getNeighbor(j);
+        Descriptor d = null;
+        d = (Descriptor) descr.clone();
+
+        ((DescriptorTopics) d).resetAge(); // Since Vicinity uses age in a different context, reset it.
+        neighborsFromAllProtocols.add(d);
+      }
+    }
+    eliminateDuplicates(neighborsFromAllProtocols);
+    return neighborsFromAllProtocols;
+  }
+  
+  private void eliminateDuplicates(Vector<Descriptor> descriptors)
+  {
+    int i = 0, j = 0;
+    boolean isRemoved = false;
+    while (i < descriptors.size()-1)
+    {
+     j = i+1;
+      isRemoved = false;
+      while (j < descriptors.size())
+      {
+        if (((DescriptorTopics)descriptors.get(i)).equals((DescriptorTopics)descriptors.get(j)))
+          if (resolveDuplicate(descriptors.get(i), descriptors.get(j)) < 0)
+          {
+            descriptors.remove(j);
+            j--;
+          }else{
+            descriptors.remove(i);
+            isRemoved = true;
+            continue;
+          }
+        j++;
+      }
+      if (!isRemoved)
+        i++;
+    }
+  }    
+  
+  public static int resolveDuplicate(Descriptor a, Descriptor b)
+  {  
+    return ((DescriptorTopics)a).getAge()-((DescriptorTopics)b).getAge();
+  }
+}

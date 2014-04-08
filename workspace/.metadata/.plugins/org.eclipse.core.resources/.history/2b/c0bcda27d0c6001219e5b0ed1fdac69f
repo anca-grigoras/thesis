@@ -1,0 +1,39 @@
+package poldercast.protocols;
+
+import peernet.core.Descriptor;
+import peernet.core.Node;
+import peernet.transport.Address;
+
+public class Rings extends Gossip
+{
+  public Rings(String prefix)
+  {
+    super(prefix);
+    // TODO Auto-generated constructor stub
+  }
+
+
+
+  @Override
+  public boolean addNeighbor(Descriptor neighbour)
+  {
+    // TODO Auto-generated method stub
+    return false;
+  }
+
+
+
+  @Override
+  public void processEvent(Address src, Node node, int pid, Object event)
+  {
+    // TODO Auto-generated method stub
+  }
+
+
+
+  @Override
+  public void nextCycle(Node node, int protocolID)
+  {
+    // TODO Auto-generated method stub
+  }
+}

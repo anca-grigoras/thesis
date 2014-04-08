@@ -1,0 +1,26 @@
+/**
+ * 
+ */
+package tera.protocols;
+
+import java.io.Serializable;
+
+/**
+ * @author anca
+ *
+ */
+public class Advertisment implements Serializable
+{
+  /**
+   * 
+   */
+  private static final long serialVersionUID = 1L;
+
+  /**
+   * 
+   */
+  public Advertisment()
+  {
+    // TODO Auto-generated constructor stub
+  }
+}

@@ -1,0 +1,53 @@
+/**
+ * 
+ */
+package poldercast.observers;
+
+import java.util.Vector;
+
+import peernet.config.Configuration;
+import peernet.core.Control;
+import peernet.core.Linkable;
+import peernet.core.Network;
+import peernet.core.Node;
+import peernet.transport.AddressSim;
+import poldercast.protocols.Rings;
+import poldercast.topics.TopicsRepository;
+
+/**
+ * @author anca
+ *
+ */
+public class RingsConvergence implements Control
+{
+  int pid;
+  int cycle = 0;
+  
+  public RingsConvergence(String name)
+  {
+    pid = Configuration.getPid(name+"."+PAR_PROTOCOL);
+  }
+
+
+  private void getRingsRT()
+  {
+    Rings a = (Rings)Network.get(0).getProtocol(pid);
+    for (int i = 0; i<Network.size(); i++)
+    {      
+      Node node = Network.get(i);
+      Vector<Integer> t = TopicsRepository.getTopics(node.getIndex());
+      for (int j = 0; j< t.size(); j++))
+      System.out.println("> "+node.getID() + " " + t.get(j)+ " " + ((Rings)node.getProtocol(pid)).degree());
+        
+    }
+  }
+  /* (non-Javadoc)
+   * @see peernet.core.Control#execute()
+   */
+  @Override
+  public boolean execute()
+  {
+    getRingsRT();
+    return false;
+  }
+}

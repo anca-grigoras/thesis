@@ -1,0 +1,11 @@
+#!/bin/bash       
+
+#param=""
+#if [ -n "$1" ]
+#then
+#param="NODES=$1"
+#fi
+
+cd workspace/PeerNetProtocolsAnca
+./go configurations/poldercast-net.cfg LOGFILE_PREFIX=$1
+#echo $1

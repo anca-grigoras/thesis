@@ -1,0 +1,136 @@
+package poldercast.protocols;
+
+import java.util.AbstractMap;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Vector;
+import java.util.AbstractMap.SimpleEntry;
+
+import peernet.core.Descriptor;
+import peernet.core.Linkable;
+import peernet.core.Node;
+import peernet.transport.Address;
+import peernet.transport.AddressSim;
+import poldercast.descriptor.DescriptorTopics;
+import poldercast.util.Util;
+
+public class Rings extends Gossip
+{
+  RingsSettings ringsSettings;
+  public Rings(String prefix)
+  {
+    super(prefix);
+    ringsSettings = (RingsSettings)settings;
+
+    view = new Vector<Descriptor>(ringsSettings.viewLen);
+  }
+
+  @Override 
+  public void nextCycle(Node node, int protocolID)
+  {
+    Vector<Descriptor> neighborsFromAllProtocols;
+    // Acquire fresh own descriptor
+    Descriptor selfDescr = getOwnDescriptor();
+    ((AddressSim)selfDescr.address).node = node;
+       
+     //***************** STEP 1:  Increase the age field of every neighbor by one
+    //assert (selfDescr instanceof DescriptorAge): "Vicinity needs DescriptorAge descriptors, or their descendants.";
+    for (Descriptor d: view)
+      ((DescriptorTopics)d).incAge();
+  
+    //COLLECT ALL NEIGHBORS (CYCLON, VICINITY, RINGS)
+    neighborsFromAllProtocols = Util.collectAllNeighbors(node, selfDescr, protocolID, view, settings);
+    
+    //UPDATE VIEW
+    view = selectToKeep(ringsSettings.viewLen, selfDescr, neigborsFromAllProtocols);
+    
+    
+    
+    Descriptor selectToGossip = Util.selectPeer(view);
+    
+    //((DescriptorTopics)selfDescr).g
+  }
+  
+  @Override
+  public void processEvent(Address src, Node node, int pid, Object event)
+  {
+    Message msg = (Message) event;
+    msg.sender.address = src; // Set the sender's address
+    switch (msg.type)
+    {
+      case GOSSIP_REQUEST:
+        processGossipRequest(msg.sender, node, pid, msg.descriptors);
+        break;
+      case GOSSIP_RESPONSE:
+        processResponse(node, pid, msg.descriptors);
+    }    
+  }
+  
+  private void processResponse(Node node, int pid, Vector<Descriptor> descriptors)
+  {
+    // TODO Auto-generated method stub
+    
+  }
+
+  private void processGossipRequest(Descriptor sender, Node node, int pid, Vector<Descriptor> descriptors)
+  {
+    // TODO Auto-generated method stub
+    
+  }  
+  
+  private void selectToKeep(Vector<Descriptor> neighbors)
+  {
+    Vector<Descriptor> relevantNeighbors = selectProximalNeighbors(neighbors);
+  }
+  
+  private Vector<Descriptor> selectProximalNeighbors(int size, Descriptor descr, Vector<Descriptor> neighbors, Vector<Descriptor> exclude)
+  {    
+    boolean nodeExcluded = false;
+    Vector<Descriptor> toReturn = new Vector<Descriptor>();
+    Vector<AbstractMap.SimpleEntry<Descriptor,Integer>> map = new Vector<AbstractMap.SimpleEntry<Descriptor,Integer>>();
+    
+    for (Descriptor d: neighbors)//neighbors does not have duplicates
+    {
+        if (exclude != null)
+          nodeExcluded = Util.isExcluded(d, exclude);
+        if (!nodeExcluded && !((DescriptorTopics)descr).isEqual(d))
+        {
+          int common = ((DescriptorTopics)descr).getCommonTopics(d);
+          AbstractMap.SimpleEntry<Descriptor,Integer> pair = new SimpleEntry<Descriptor, Integer>(d, common);
+          map.add(pair);
+        }
+    }
+    
+    Collections.sort(map, new Comparator<AbstractMap.SimpleEntry<Descriptor,Integer>>() {
+      public int compare(SimpleEntry<Descriptor, Integer> a,
+          SimpleEntry<Descriptor, Integer> b) {
+        return b.getValue().compareTo(a.getValue());
+      }
+    });
+    
+    int len = map.size()> size ? size : map.size();
+    
+    for (int i = 0; i < len; i++)
+    {
+    //this is the selection function described but i don't agree. the below lines should not be commented      
+      if (map.get(i).getValue() == 0)
+        return toReturn;
+      toReturn.add(map.get(i).getKey());
+    }
+    return toReturn;
+  }
+  
+  @Override
+  public boolean addNeighbor(Descriptor neighbour)
+  {
+    if (contains(neighbour))
+      return false;
+
+    if (view.size() >= ringsSettings.viewLen)
+      throw new IndexOutOfBoundsException();
+
+    view.add(neighbour);
+    return true;
+  } 
+  
+}

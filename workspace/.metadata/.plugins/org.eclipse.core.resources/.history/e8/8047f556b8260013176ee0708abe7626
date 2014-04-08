@@ -1,0 +1,20 @@
+/**
+ * 
+ */
+package tera.protocols;
+
+/**
+ * @author anca
+ *
+ */
+public class Tera extends Gossip
+{
+  /**
+   * @param prefix
+   */
+  public Tera(String prefix)
+  {
+    super(prefix);
+    // TODO Auto-generated constructor stub
+  }
+}

@@ -1,0 +1,85 @@
+package tera.topics;
+
+import peernet.core.Network;
+
+/**
+ * 
+ * @author anca
+ * 
+ */
+
+public class Topic
+{
+  int id;
+  int overlayId;
+ 
+  public Topic(int id)
+  {
+    this.id = id;
+    long min = Long.MAX_VALUE;
+    for (int i = 0; i< Network.size(); i++)
+    {
+      long nid = Network.get(i).getID();
+      if (Math.abs(id-nid) < min)
+      {
+        min = Math.abs(id-nid);
+        randevouz = nid;
+      }
+    }
+  }
+
+  /**
+   * @return the id
+   */
+  public int getId()
+  {
+    return id;
+  }
+
+  /**
+   * @param id the id to set
+   */
+  public void setId(int id)
+  {
+    this.id = id;
+  }
+
+  /**
+   * @return the randevouz
+   */
+  public long getRandevouz()
+  {
+    return randevouz;
+  }
+  
+  /* (non-Javadoc)
+   * @see java.lang.Object#hashCode()
+   */
+  @Override
+  public int hashCode()
+  {
+    final int prime = 31;
+    int result = 1;
+    result = prime*result+id;
+    return result;
+  }
+
+  /* (non-Javadoc)
+   * @see java.lang.Object#equals(java.lang.Object)
+   */
+  @Override
+  public boolean equals(Object obj)
+  {
+    if (this==obj)
+      return true;
+    if (obj==null)
+      return false;
+    if (getClass()!=obj.getClass())
+      return false;
+    Topic other = (Topic) obj;
+    if (id!=other.id)
+      return false;
+    return true;
+  }
+ 
+}

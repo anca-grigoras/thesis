@@ -1,0 +1,351 @@
+package poldercast.protocols;
+
+import poldercast.descriptor.DescriptorTopics;
+import poldercast.protocols.VicinitySettings;
+
+import java.util.AbstractMap;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Vector;
+import java.util.AbstractMap.SimpleEntry;
+
+import peernet.core.Descriptor;
+import peernet.core.Linkable;
+import peernet.core.Node;
+import peernet.transport.Address;
+
+public class Vicinity extends Gossip
+{
+
+  VicinitySettings vicSettings;
+  
+  public Vicinity(String prefix)
+  {
+    super(prefix);
+    vicSettings = (VicinitySettings)settings;
+
+    view = new Vector<Descriptor>(vicSettings.viewLen);
+    numMsg = 0;
+  }
+
+  @Override
+  public void nextCycle(Node node, int protocolID)
+  {
+    Vector<Descriptor> neighborsFromAllProtocols;
+    // Acquire fresh own descriptor
+    // Need to call getOwnDescriptor, as it may produce gradually changing profiles. This is node P
+    Descriptor selfDescr = createDescriptor();
+   // ((AddressSim)selfDescr.address).node = node;
+    
+  //***************** STEP 3:   Merge the VICINITY, CYCLON (and RINGS-- later) views in one Vp = Vvic U Vcyclon (U Vrings) 
+    neighborsFromAllProtocols = collectAllNeighbors(node, selfDescr, protocolID);
+    
+    if (view.isEmpty())
+    {
+    //update own view
+      view = selectToKeep(vicSettings.viewLen, selfDescr, neighborsFromAllProtocols);
+    }
+    
+     //***************** STEP 1:  Increase the age field of every neighbor by one
+    //assert (selfDescr instanceof DescriptorAge): "Vicinity needs DescriptorAge descriptors, or their descendants.";
+    for (Descriptor d: view)
+      ((DescriptorTopics)d).incAge();  
+    
+  //***************** STEP 2:   Select neighbor Q with the highest age among all neighbors, and remove it from the VICINITY view: Vvic = Vvic -{Q} (after step 3). This is node Q
+    Descriptor gossipChoice = selectPeer();
+    if (gossipChoice == null)
+      return;
+    
+    //***************** STEP 4: Add own descriptor with own profile and age 0 to the merged view: Vp= Vp U {P} -- I added the own descriptor to neighborsToSend list
+    ((DescriptorTopics)selfDescr).resetAge();
+    neighborsFromAllProtocols.add(selfDescr);
+    
+    
+    neighborsFromAllProtocols.remove(gossipChoice);
+    
+    //***************** STEP 5: Strip down Vp to its gvic best descriptors for Q, by applying the selection function from Q's perspective Vp = S(gvic, Q, Vp)
+    Vector<Descriptor> neighborsToSend = selectToSend(vicSettings.gossipLen, gossipChoice, neighborsFromAllProtocols, null);
+    neighborsFromAllProtocols.remove(selfDescr);
+    neighborsFromAllProtocols.add(gossipChoice);
+    view = selectToKeep(vicSettings.viewLen, selfDescr, neighborsFromAllProtocols);
+    
+    numMsg++;
+    //***************** STEP 6: Send Vp to peer Q
+    Message msg = new Message();
+    msg.type = Message.Type.GOSSIP_REQUEST;
+    msg.sender = selfDescr;
+    msg.descriptors = neighborsToSend;
+    send(gossipChoice.address, protocolID, msg);
+  }
+
+  @Override
+  public void processEvent(Address src, Node node, int pid, Object event)
+  {
+    Message msg = (Message) event;
+    numMsg++;
+    msg.sender.address = src; // Set the sender's address
+    switch (msg.type)
+    {
+      case GOSSIP_REQUEST:
+        processGossipRequest(msg.sender, node, pid, msg.descriptors);
+        break;
+      case GOSSIP_RESPONSE:
+        processResponse(node, pid, msg.descriptors);
+    }    
+  }
+
+  /**
+   * This is the passive thread. Executes steps 3-9
+   * @param sender
+   * @param node
+   * @param pid
+   * @param received
+   */
+  protected void processGossipRequest(Descriptor sender, Node node, int pid, Vector<Descriptor> received)
+  {
+    Descriptor selfDescr = createDescriptor();
+    //((AddressSim)selfDescr.address).node = node;
+
+    //***************** STEP 3:   Merge the VICINITY, CYCLON (and RINGS -- later) views in one Vp = Vvic U Vcyclon (U Vrings) 
+    Vector<Descriptor> neighborsFromAllProtocols = collectAllNeighbors(node, selfDescr, pid);
+
+    //***************** STEP 4: Add own descriptor with own profile and age ) to the merged view: Vp= Vp U {P}
+    ((DescriptorTopics)selfDescr).resetAge();
+    neighborsFromAllProtocols.add(selfDescr);
+    
+    neighborsFromAllProtocols.remove(sender);//remove is not working. the descriptors are diff. use index.shouldn't we apply step 2 as well here???
+
+    //***************** STEP 5: Strip down Vp to its gvic best descriptors for P, by applying the selection function from P's perspective: Vq = S(gvic, P, Vq)
+    Vector<Descriptor> neighborsToSend = selectToSend(vicSettings.gossipLen,sender,neighborsFromAllProtocols, received);
+    
+    neighborsFromAllProtocols.remove(selfDescr);//i should not be in my own view
+    neighborsFromAllProtocols.add(sender);
+    //should i increase the age?????
+    neighborsFromAllProtocols.addAll(received);
+    eliminateDuplicates(neighborsFromAllProtocols);
+    view = selectToKeep(vicSettings.viewLen, selfDescr, neighborsFromAllProtocols);
+
+    numMsg++;
+    //***************** STEP 6: Send Vp to peer Q
+    Message msg = new Message();
+    msg.type = Message.Type.GOSSIP_RESPONSE;
+    msg.sender = selfDescr;
+    msg.descriptors = neighborsToSend;
+    send(sender.address, pid, msg);
+  }
+
+  /**
+   * This function represents
+   * STEP 7: Similarly, receive Vq from peer Q, containing a set of (up to) gvic descriptors known by Q, optimally selected for P.
+   * @param node
+   * @param pid
+   * @param received
+   */
+  protected void processResponse(Node node, int pid, Vector<Descriptor> received)
+  {
+    Vector<Descriptor> neighborsFromAllProtocols;
+    Descriptor selfDescr = createDescriptor();
+   // ((AddressSim)selfDescr.address).node = node;
+
+    //***************** STEP 8: Merge the VICINITY, CYCLON (and RINGS -- later), and received views in one: V = Vvic U Vcyclon U Vrings U Vq
+    neighborsFromAllProtocols = collectAllNeighbors(node, selfDescr, pid);
+    neighborsFromAllProtocols.addAll(received);
+    eliminateDuplicates(neighborsFromAllProtocols);
+   
+    //***************** STEP 9: Rebuild the VICINITY view by selecting the best lvic neighbors from V: Vvic = S(lvic,P,V).
+    view = selectToKeep(vicSettings.viewLen, selfDescr, neighborsFromAllProtocols);
+  }
+  
+    
+  /**
+  * 
+  * @param gossipLen
+  * @param gossipChoice
+  * @param neighbors
+  * @param exclude
+  * @return
+  */
+  private Vector<Descriptor> selectToSend(int gossipLen, Descriptor gossipChoice, Vector<Descriptor> neighbors, Vector<Descriptor> exclude)
+  {
+    //int index = ((AddressSim)gossipChoice.address).getNode().getIndex();
+    return selectProximalNeighbors(gossipLen, gossipChoice, neighbors, exclude);
+  }
+  
+  /**
+   * 
+   * @param viewLen
+   * @param selfDescr
+   * @param neighborsFromAllProtocols2
+   * @return
+   */
+  private Vector<Descriptor> selectToKeep(int viewLen, Descriptor descr, Vector<Descriptor> neighborsFromAllProtocols)
+  {
+    return selectProximalNeighbors(viewLen, descr, neighborsFromAllProtocols, null);
+  }
+  
+  private Vector<Descriptor> selectProximalNeighbors(int size, Descriptor descr, Vector<Descriptor> neighbors, Vector<Descriptor> exclude)
+  {    
+     boolean nodeExcluded = false;
+    Vector<Descriptor> toReturn = new Vector<Descriptor>();
+    Vector<AbstractMap.SimpleEntry<Descriptor,Integer>> map = new Vector<AbstractMap.SimpleEntry<Descriptor,Integer>>();
+    
+    for (Descriptor d: neighbors)//neighbors does not have duplicates
+    {
+        if (exclude != null)
+          nodeExcluded = isExcluded(d, exclude);
+        if (!nodeExcluded && !((DescriptorTopics)descr).equals(d))
+        {
+          int common = ((DescriptorTopics)descr).getNbCommonTopics(d);
+          //double common = getDistanceMetric(descr,d);
+          AbstractMap.SimpleEntry<Descriptor,Integer> pair = new SimpleEntry<Descriptor, Integer>(d, common);
+          map.add(pair);
+        }
+    }
+    
+    Collections.sort(map, new Comparator<AbstractMap.SimpleEntry<Descriptor,Integer>>() {
+      public int compare(SimpleEntry<Descriptor, Integer> a,
+          SimpleEntry<Descriptor, Integer> b) {
+        return b.getValue().compareTo(a.getValue());
+      }
+    });
+    
+    int len = map.size()> size ? size : map.size();
+    
+    for (int i = 0; i < len; i++)
+      toReturn.add(map.get(i).getKey());
+  
+    return toReturn;
+  }
+    
+  /**
+   * @param descr
+   * @param d
+   * @return
+   */
+  private double getDistanceMetric(Descriptor descr, Descriptor d)
+  {
+    int size1 = ((DescriptorTopics)descr).getTopics().size();
+    int size2 = ((DescriptorTopics)d).getTopics().size();
+    int common = ((DescriptorTopics)descr).getNbCommonTopics(d);
+    int total = size1+size2-common;
+    
+    return (double)common/total;
+  }
+
+  /**
+   * Puts together all neighbors of this protocol and all linked protocols.
+   * Descriptors are NOT necessarily cloned. The idea is that preparing a
+   * collection of all neighbors should be fast, and cloning should be mandatory
+   * when selecting out of these neighbors either to feed my view, or to send
+   * to my peer.
+   * 
+   * @param selfNode
+   * @param selfDescr
+   * @param pid
+   * @return Returned descriptors are NOT guaranteed to be cloned.
+   */
+  private Vector<Descriptor> collectAllNeighbors(Node selfNode, Descriptor selfDescr, int pid)
+  {
+    // If no protocols are linked, return the view, as is.
+    if (!settings.hasLinkable())
+      return view;
+
+    Vector<Descriptor> neighborsFromAllProtocols = new Vector<Descriptor>();
+
+    // First collect my own neighbors (not cloned)
+    for (Descriptor d: view)
+      neighborsFromAllProtocols.add(d);
+
+    // Then collect neighbors from linked protocols
+    for (int i=0; i<settings.numLinkables(); i++)
+    {
+      int linkableID = settings.getLinkable(i);
+      Linkable linkable = (Linkable) selfNode.getProtocol(linkableID);
+      // Add linked protocol's neighbors
+      for (int j = 0; j<linkable.degree(); j++)
+      {
+        // We have to clone it, to change its age without affecting Cyclon.
+        Descriptor descr = (Descriptor) linkable.getNeighbor(j);
+        Descriptor d = null;
+        d = (Descriptor) descr.clone();
+
+        ((DescriptorTopics) d).resetAge(); // Since Vicinity uses age in a different context, reset it.
+        neighborsFromAllProtocols.add(d);
+      }
+    }
+    eliminateDuplicates(neighborsFromAllProtocols);
+    return neighborsFromAllProtocols;
+  }
+  
+  
+  /**
+   * 
+   * @return
+   */
+  private Descriptor selectPeer()
+  {
+    DescriptorTopics maxAgeDescr = null;
+
+    for (Descriptor d: view)
+      if (maxAgeDescr==null || ((DescriptorTopics) d).getAge() > maxAgeDescr.getAge())
+        maxAgeDescr = (DescriptorTopics) d;
+
+    return maxAgeDescr;
+  }
+  
+  private void eliminateDuplicates(Vector<Descriptor> descriptors)
+  {
+    int i = 0, j = 0;
+    boolean isRemoved = false;
+    while (i < descriptors.size()-1)
+    {
+     j = i+1;
+      isRemoved = false;
+      while (j < descriptors.size())
+      {
+        if (((DescriptorTopics)descriptors.get(i)).equals((DescriptorTopics)descriptors.get(j)))
+          if (resolveDuplicate(descriptors.get(i), descriptors.get(j)) < 0)
+          {
+            descriptors.remove(j);
+            j--;
+          }else{
+            descriptors.remove(i);
+            isRemoved = true;
+            continue;
+          }
+        j++;
+      }
+      if (!isRemoved)
+        i++;
+    }
+  }    
+  
+  public static int resolveDuplicate(Descriptor a, Descriptor b)
+  {  
+    return ((DescriptorTopics)a).getAge()-((DescriptorTopics)b).getAge();
+  }
+  
+  public static boolean isExcluded(Descriptor descr, Vector<Descriptor> descriptors)
+  {
+    for (int i = 0; i< descriptors.size(); i++)
+    {
+      if (((DescriptorTopics)descr).equals(descriptors.get(i)))
+        return true;
+    }
+    return false;
+  }
+
+  @Override
+  public boolean addNeighbor(Descriptor neighbour)
+  {
+    if (contains(neighbour))
+      return false;
+
+    if (view.size() >= vicSettings.viewLen)
+      throw new IndexOutOfBoundsException();
+
+    view.add(neighbour);
+    return true;
+  }
+  
+}

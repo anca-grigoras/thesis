@@ -1,0 +1,443 @@
+/**
+ * 
+ */
+package vitis.protocols;
+
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.Vector;
+
+import peernet.core.CommonState;
+import peernet.core.Descriptor;
+import peernet.core.Node;
+import peernet.transport.Address;
+import vitis.descriptor.DescriptorTopics;
+import vitis.topics.Topic;
+import vitis.descriptor.Profile;
+import vitis.descriptor.Proposal;
+import vitis.protocols.Message;
+
+/**
+ * @author anca
+ *
+ */
+public class Vitis extends Gossip
+{
+  public VitisSettings vitisSettings;
+  
+  //protected HashMap<Integer,RoutingTable> rtMap = new HashMap<Integer, RoutingTable>();
+  
+  /**
+   * @param prefix
+   */
+  public Vitis(String prefix)
+  {
+    super(prefix);
+    vitisSettings = (VitisSettings)settings;
+    view = new Vector<Descriptor>(vitisSettings.viewLen);
+  }
+
+  /* (non-Javadoc)
+   * @see peernet.core.Linkable#addNeighbor(peernet.core.Descriptor)
+   */
+  @Override
+  public boolean addNeighbor(Descriptor neighbour)
+  {
+    if (contains(neighbour))
+      return false;
+
+    if (view.size() >= vitisSettings.viewLen)
+      throw new IndexOutOfBoundsException();
+
+    view.add(neighbour);
+    return true;
+  }
+
+  /* (non-Javadoc)
+   * @see peernet.core.Protocol#processEvent(peernet.transport.Address, peernet.core.Node, int, java.lang.Object)
+   */
+  @Override
+  public void processEvent(Address src, Node node, int pid, Object event)
+  {
+    Message msg = (Message) event;
+    msg.sender.address = src; // Set the sender's address
+    switch (msg.type)
+    {
+      case RT_REQUEST:
+        processRTRequest(msg.sender, node, pid, msg.descriptors);
+        break;
+      case RT_RESPONSE:
+        processRTResponse(node, pid, msg.descriptors);
+        break;
+      case PROFILE_REQUEST:
+        processProfileRequest(msg.sender, node, pid, msg.profile);
+        break;
+      case PROFILE_RESPONSE:
+        processProfileResponse(node, pid, msg.descriptors);
+    }   
+    
+  }
+
+  /**
+   * @param sender
+   * @param node
+   * @param pid
+   * @param descriptors
+   */
+  private void processRTRequest(Descriptor sender, Node node, int pid, Vector<Descriptor> descriptors)
+  {
+    Vector<Descriptor> neighborsFromAllProtocols;
+    Vector<Descriptor> candidates = new Vector<Descriptor>();
+    Descriptor selfDescr = createDescriptor();
+    
+    neighborsFromAllProtocols = collectAllNeighbors(node, selfDescr, pid, view, settings);
+    candidates.addAll(neighborsFromAllProtocols);
+    candidates.addAll(descriptors);
+    view = selectNeighbors(selfDescr, candidates);
+    
+    Message msg = new Message();
+    msg.type = Message.Type.RT_RESPONSE;
+    msg.sender = selfDescr;
+    msg.descriptors = neighborsFromAllProtocols;
+    send(sender.address, pid, msg);
+    
+  }
+  
+  /**
+   * @param node
+   * @param pid
+   * @param descriptors
+   */
+  private void processRTResponse(Node node, int pid, Vector<Descriptor> descriptors)
+  {
+    Vector<Descriptor> neighborsFromAllProtocols;
+    Descriptor selfDescr = createDescriptor();
+    
+    neighborsFromAllProtocols = collectAllNeighbors(node, selfDescr, pid, view, settings);
+    neighborsFromAllProtocols.addAll(descriptors);
+    view = selectNeighbors(selfDescr, neighborsFromAllProtocols);
+    
+  }  
+  
+  /**
+   * @param sender
+   * @param node
+   * @param pid
+   * @param descriptors
+   */
+  private void processProfileRequest(Descriptor sender, Node node, int pid, Profile profile)
+  {
+    Descriptor selfDescr = createDescriptor();
+    ((DescriptorTopics)selfDescr).updateProfile(profile);
+    if (view.contains(sender))
+    {
+      ((DescriptorTopics)sender).resetAge();
+    }
+    //DOESN'T IT SEND BACK ITS PROFILE???
+//    Message msg = new Message();
+//    msg.type = Message.Type.PROFILE_RESPONSE;
+//    msg.sender = selfDescr;
+//    msg.profile = ;
+//    send(sender.address, pid, msg);
+  }
+
+  /**
+   * @param node
+   * @param pid
+   * @param descriptors
+   */
+  private void processProfileResponse(Node node, int pid, Vector<Descriptor> descriptors)
+  {
+    Vector<Descriptor> neighborsFromAllProtocols;
+    Descriptor selfDescr = createDescriptor();
+    
+    neighborsFromAllProtocols = collectAllNeighbors(node, selfDescr, pid, view, settings);
+    selectNeighbors(selfDescr, neighborsFromAllProtocols);
+  }
+
+  
+  /* (non-Javadoc)
+   * @see peernet.core.Protocol#nextCycle(peernet.core.Node, int)
+   */
+  @Override
+  public void nextCycle(Node node, int protocolID)
+  {
+    Vector<Descriptor> neighborsFromAllProtocols;
+    Descriptor selfDescr = createDescriptor();
+    
+    //initRoutingTable();
+    
+    neighborsFromAllProtocols = collectAllNeighbors(node, selfDescr, protocolID, view, settings);
+    
+    exchangeRT(neighborsFromAllProtocols, selfDescr, protocolID);
+    exchangeProfile(selfDescr, protocolID);    
+  }
+
+  /**
+   * T-Man protocol
+   * @param neighbors
+   */
+  private void exchangeRT(Vector<Descriptor> neighbors, Descriptor descr, int pid)
+  {
+    if (neighbors == null)
+      return;
+    
+    int index = CommonState.r.nextInt(neighbors.size());
+    Collections.shuffle(neighbors);
+    Descriptor gossipChoice = neighbors.get(0);
+    
+    //merge with the local RT
+    neighbors.addAll(view);
+    
+    //update the local routing table
+    view = selectNeighbors(descr, neighbors);
+    
+    //send the neighbors to gossipChoice    
+    Message msg = new Message();
+    msg.type = Message.Type.RT_REQUEST;
+    msg.sender = descr;
+    msg.descriptors = neighbors;
+    send(gossipChoice.address, pid, msg);
+  }
+  
+  /**
+   * 
+   */
+  private void exchangeProfile(Descriptor descr, int pid)
+  {
+    Profile profile = updateProfile(descr); 
+    Iterator<Descriptor> it = view.iterator();
+    while (it.hasNext())
+    {
+      Descriptor d = it.next();
+      if (((DescriptorTopics)d).getAge() > vitisSettings.threshold)
+        it.remove();
+        else
+        {
+          ((DescriptorTopics)d).incAge();
+          //send profile to neighbor
+          Message msg = new Message();
+          msg.type = Message.Type.PROFILE_REQUEST;
+          msg.sender = descr;
+          msg.profile = profile; 
+          send(d.address, pid, msg);
+        }
+    }
+      
+  } 
+
+  /**
+   * 
+   */
+  private Profile updateProfile(Descriptor descr)
+  {
+    int d = vitisSettings.maxHops;
+    Profile profile = (((DescriptorTopics)descr).getProfile());
+    for (Topic topic : ((DescriptorTopics)descr).getTopics())
+    {
+      int topicID = topic.getId();
+      Proposal prop = new Proposal(descr, descr, 0); //init proposal
+      
+      for (Descriptor neighbor : view)
+      {
+        if (((DescriptorTopics)neighbor).isSubscribedTo(topic))
+        {
+          Proposal newProp = ((DescriptorTopics)neighbor).getProfile().getProposal(topicID);
+          if (newProp != null)
+          {
+            if (neighbor.equals(newProp.getParent()) || (!view.contains(newProp.getParent()))) //CHECK IF EQUALS IS WORKING CORECT. IF NOT, CONVERT TO DESCRIPTORTOPICS
+            {
+              long currentDist, newDist;
+              currentDist = getDistance(prop.getGW().getID(), topicID);
+              newDist = getDistance(newProp.getGW().getID(), topicID);
+              
+              if(newDist < currentDist && newProp.getHops()+1 < d)
+                prop.update(newProp.getGW(), neighbor, newProp.getHops()+1);
+              if(newProp.getGW().equals(prop.getGW()) && newProp.getHops()+1 < prop.getHops())
+                prop.update(newProp.getGW(), neighbor, newProp.getHops()+1);
+            }
+          }
+        }
+      }
+      profile.update(topicID, prop);
+      if (prop.getGW().equals(descr))
+        requestRelay(topic);
+    }
+    return profile;
+  }
+  
+  /**
+   * @param topic
+   * @return 
+   */
+  Descriptor requestRelay(Topic topic)
+  {
+    return null;
+    // TODO Auto-generated method stub
+    
+  }
+
+  /**
+   * Is it the difference between the ids? In the article it says how close is the id of the node to the id of the topic
+   * @param nodeID
+   * @param topicID
+   * @return
+   */
+  private long getDistance(long nodeID, long topicID)
+  {
+    return Math.abs(nodeID-topicID);
+  }
+
+  /**
+   * 
+   * @param descr
+   * @param neighbors
+   * @return
+   */
+  private Vector<Descriptor> selectNeighbors(Descriptor descr, Vector<Descriptor> neighbors)
+  {
+    
+    Collections.sort(neighbors, new Comparator<Descriptor>()
+    {
+     @Override
+      public int compare(Descriptor a, Descriptor b)
+      {
+       return (int) (a.getID()-b.getID());
+      }
+    });
+    
+    Descriptor predecessor = null, successor = null;
+    Vector<Descriptor> selectedNeighbors = new Vector<Descriptor>();
+    int swn = vitisSettings.sw_neighbors;
+    
+    for (int i = 0; i< neighbors.size(); i++)
+      if (neighbors.get(i).getID() < descr.getID())
+        predecessor = neighbors.get(i);
+      else
+        if (neighbors.get(i).getID() > descr.getID())
+        {
+          successor = neighbors.get(i);
+          break;
+        }
+    
+    if (predecessor != null)
+    {
+      neighbors.remove(predecessor);
+      selectedNeighbors.add(predecessor);
+    }
+    
+    if (successor != null)
+    {
+      neighbors.remove(successor);
+      selectedNeighbors.add(successor);
+    }
+    
+    //select-sw-neighbor
+    Vector<Descriptor> sw_neighbors = selectSWNeighbors(descr, neighbors, vitisSettings.sw_neighbors);
+    if (sw_neighbors.size() < swn)
+      swn = sw_neighbors.size();
+    neighbors.removeAll(sw_neighbors);
+    selectedNeighbors.addAll(sw_neighbors);
+    
+    
+    HashMap<Descriptor,Double> utility = new HashMap<Descriptor, Double>();
+    
+    for (Descriptor node: neighbors)
+    {
+      double ut = calculateUtility(node,descr);
+      if (ut != 0) //WE SHOULD HAVE THIS CONDITION, RIGHT???
+        utility.put(node, ut);
+    }
+    List<Map.Entry<Descriptor, Double>> list = new LinkedList<Map.Entry<Descriptor, Double>>(utility.entrySet());
+
+    Collections.sort(list, new Comparator<Map.Entry<Descriptor, Double>>() {
+
+        public int compare(Map.Entry<Descriptor, Double> m1, Map.Entry<Descriptor, Double> m2) {
+            return (m2.getValue()).compareTo(m1.getValue());
+        }
+    });
+
+    Vector<Descriptor> sortedNeighbors = new Vector<Descriptor>();
+    int i = 0;
+    for (Entry<Descriptor, Double> entry : list) {
+      if (i < vitisSettings.viewLen-swn-2)
+        sortedNeighbors.add(entry.getKey());
+      i++;
+    }
+    
+    selectedNeighbors.addAll(sortedNeighbors);
+    return selectedNeighbors;    
+  }
+
+  /**
+   * @param neighbors
+   * @param sw_neighbors
+   * @return
+   */
+  private Vector<Descriptor> selectSWNeighbors(Descriptor descr, Vector<Descriptor> neighbors, int sw_neighbors)
+  {
+    Vector<Descriptor> swNeighbors = new Vector<Descriptor>();
+    int count = 0;
+    int i = 0;
+    Random rn;
+    int max = ((DescriptorTopics)descr).getTopicsIDs().size();
+    while (i == 0)
+    {
+     rn = new Random();
+     i = rn.nextInt(max); 
+    }
+       
+    for (Descriptor d: neighbors)
+    {
+      if(((DescriptorTopics)descr).getNbCommonTopics(d) == i && count < sw_neighbors)
+      {
+        swNeighbors.add(d);
+        count++;
+      }
+    }
+    return swNeighbors;
+  }
+
+  /** For now, I consider that the distribution is uniform of the topic publication rates.
+   * @param node
+   * @param descr
+   * @return
+   */
+  private double calculateUtility(Descriptor node, Descriptor descr)
+  {
+    Set<Integer> commonTopics = new HashSet<Integer>();
+    Set<Integer> allTopics = new HashSet<Integer>();
+    commonTopics.addAll(((DescriptorTopics)node).getCommonTopics(descr));
+    allTopics.addAll(((DescriptorTopics)node).getTopicsIDs());
+    allTopics.addAll(((DescriptorTopics)descr).getTopicsIDs());
+    
+    return commonTopics.size()/allTopics.size();
+  }
+
+  /**
+   * @return
+   */
+  public boolean isGateway()
+  {
+    // TODO Auto-generated method stub
+    return false;
+  }
+
+  /**
+   * @return
+   */
+  public Descriptor getRelayNode()
+  {
+    // TODO Auto-generated method stub
+    return null;
+  }
+}

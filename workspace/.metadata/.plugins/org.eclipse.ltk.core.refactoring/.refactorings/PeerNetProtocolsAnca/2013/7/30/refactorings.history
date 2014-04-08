@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Rename type &apos;poldercast.observers.ingsNeighbors&apos; to &apos;RingsNeighbors&apos;&#x0A;- Original project: &apos;PeerNetProtocolsAnca&apos;&#x0A;- Original element: &apos;poldercast.observers.ingsNeighbors&apos;&#x0A;- Renamed element: &apos;poldercast.observers.RingsNeighbors&apos;&#x0A;- Update references to refactored element&#x0A;- Update textual occurrences in comments and strings" description="Rename type &apos;ingsNeighbors&apos;" flags="589830" id="org.eclipse.jdt.ui.rename.type" input="/src&lt;poldercast.observers{ingsNeighbors.java[ingsNeighbors" matchStrategy="1" name="RingsNeighbors" qualified="false" references="true" similarDeclarations="false" stamp="1374940349559" textual="false" version="1.0"/>
+</session>

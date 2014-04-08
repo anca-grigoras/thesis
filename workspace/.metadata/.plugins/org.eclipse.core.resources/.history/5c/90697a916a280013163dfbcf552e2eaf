@@ -1,0 +1,73 @@
+/**
+ * 
+ */
+package poldercast.observers;
+
+import peernet.config.Configuration;
+import peernet.core.CommonState;
+import peernet.core.Control;
+import peernet.core.Network;
+import peernet.core.Node;
+import poldercast.protocols.Cyclon;
+import poldercast.protocols.Dissemination;
+import poldercast.protocols.Rings;
+import poldercast.protocols.Vicinity;
+import poldercast.topics.TopicsRepository;
+
+/**
+ * @author anca
+ *
+ */
+public class BandwithConsumption implements Control
+{
+  private static final String PAR_PROT2 = "prot2";
+  private static final String PAR_PROT3 = "prot3";
+  
+  int pid1, pid2, pid3;
+  int cycle = 0;
+  int size = 0;
+  /**
+   * 
+   */
+  public BandwithConsumption(String name)
+  {
+    pid1 = Configuration.getPid(name+"."+PAR_PROTOCOL);
+    pid2 = Configuration.getPid(name+"."+PAR_PROT2);
+    pid3 = Configuration.getPid(name+"."+PAR_PROT3);
+    size = Network.size();
+  }
+
+
+
+  /* (non-Javadoc)
+   * @see peernet.core.Control#execute()
+   */
+  @Override
+  public boolean execute()
+  {
+    System.out.println("Time: "+CommonState.getTime());
+    calculateBandwithConsumption();
+    return false;
+  }
+
+
+
+  /**
+   * 
+   */
+  private void calculateBandwithConsumption()
+  {
+    for (int i = 0; i< size; i++)
+    {
+      Node n = Network.get(i);
+      Cyclon cyclon = (Cyclon)n.getProtocol(pid1);
+      Vicinity vic = (Vicinity)n.getProtocol(pid2);
+      Rings rings = (Rings)n.getProtocol(pid3);
+      int subscriptionSize = TopicsRepository.getTopics(n.getID()).size();
+      int bandwithConsumption = cyclon.controlMessages+vic.controlMessages+rings.numMsg;
+      cyclon.resetcontrolMessages(); vic.resetcontrolMessages(); rings.resetNumMsg();
+      System.out.println(subscriptionSize + " \t" + bandwithConsumption);
+    }
+    
+  }
+}

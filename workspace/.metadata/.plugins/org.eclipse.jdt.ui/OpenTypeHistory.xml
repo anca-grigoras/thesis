@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<typeInfoHistroy>
+<typeInfo handle="=PeerNet/src&lt;peernet.core{Descriptor.java[Descriptor" modifiers="1" timestamp="1376160123000"/>
+<typeInfo handle="=PeerNet/src&lt;peernet.core{Control.java[Control" modifiers="513" timestamp="1371734224000"/>
+<typeInfo handle="=PeerNet/src&lt;peernet.core{Protocol.java[Protocol" modifiers="1025" timestamp="1372328630000"/>
+<typeInfo handle="=PeerNetProtocolsAnca/src&lt;tera.protocols{Gossip.java[Gossip" modifiers="1025" timestamp="1380205884000"/>
+<typeInfo handle="=PeerNet/src&lt;peernet.core{ProtocolSettings.java[ProtocolSettings" modifiers="1" timestamp="1372328630000"/>
+</typeInfoHistroy>

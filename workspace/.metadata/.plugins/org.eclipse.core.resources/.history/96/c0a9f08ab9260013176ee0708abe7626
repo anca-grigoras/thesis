@@ -1,0 +1,19 @@
+/**
+ * 
+ */
+package tera.protocols;
+
+/**
+ * @author anca
+ *
+ */
+public class SubscriptionManagement extends Gossip
+{
+  /**
+   * 
+   */
+  public SubscriptionManagement()
+  {
+    // TODO Auto-generated constructor stub
+  }
+}

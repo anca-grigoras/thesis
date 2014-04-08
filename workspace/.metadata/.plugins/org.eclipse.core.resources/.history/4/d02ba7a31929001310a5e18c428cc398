@@ -1,0 +1,174 @@
+/**
+ * 
+ */
+package poldercast.observers;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.Vector;
+
+import peernet.config.Configuration;
+import peernet.core.CommonState;
+import peernet.core.Control;
+import peernet.core.Network;
+import peernet.core.Node;
+import poldercast.protocols.Rings;
+import poldercast.topics.RoutingTable;
+import poldercast.topics.Topics;
+import poldercast.topics.TopicsRepository;
+
+/**
+ * @author anca
+ *
+ */
+public class ScalabilitySubscriptionSize implements Control
+{
+  int pid;
+  int cycle = 0;
+  int size = 0;
+  Vector<Boolean> converged = null;
+  /**
+   * 
+   */
+  public ScalabilitySubscriptionSize(String name)
+  {
+    pid = Configuration.getPid(name+"."+PAR_PROTOCOL);
+    size = Network.size();
+    converged = new Vector<Boolean>(size);
+    for (int i = 0; i< size; i++)
+      converged.add(false);
+  }
+
+
+
+  /* (non-Javadoc)
+   * @see peernet.core.Control#execute()
+   */
+  @Override
+  public boolean execute()
+  {
+    System.out.println();
+    //System.out.println("Time: "+CommonState.getTime());
+    cycle++;
+    System.out.println(cycle);
+    checkNodeConvergence();
+    return false;
+  }
+  /**
+   * 
+   */
+  private void checkNodeConvergence()
+  {
+    int convergedNodes = 0;
+    HashMap<Long, Integer> nodeSubscrMap = new HashMap<Long, Integer>();
+    for (int i = 0; i< Network.size(); i++)
+    {
+      if (!converged.get(i))
+      {
+        int convergedRings = 0;
+        Node n = Network.get(i);
+        Rings rings = (Rings)n.getProtocol(pid);
+        Vector<Topics> myTopics = TopicsRepository.getTopics(n.getID());
+        int subscriptionSize = myTopics.size();
+        for (int topic : myTopics)
+        {
+          RoutingTable rt = rings.getRT(topic);
+          if (isConverged(rt,n.getID(), topic))
+          convergedRings++;
+        }
+        if (convergedRings == subscriptionSize)
+        {
+          convergedNodes++;
+          nodeSubscrMap.put(n.getID(), subscriptionSize);
+          converged.remove(i);converged.add(i, true);
+        }
+      }
+    }
+    System.out.print(convergedNodes + " \t");
+    Set<Entry<Long,Integer>> set = nodeSubscrMap.entrySet();
+    Iterator<Entry<Long,Integer>> it = set.iterator();
+    while (it.hasNext())
+    {
+      Entry<Long,Integer> entry = it.next();
+      System.out.print(entry.getValue() + " ");
+    }
+    System.out.println();
+  }
+
+
+
+  /**
+   * @param rt
+   * @param id
+   * @param topic
+   * @return
+   */
+  private boolean isConverged(RoutingTable rt, long id, int topic)
+  {
+    Vector<Long> bestNeighbors = getBestNeighbors(topic, id);
+    Vector<Long> realNeighbors = getRealNeighbors(rt);
+    for(long neighbor : bestNeighbors)
+      if(!realNeighbors.contains(neighbor))
+        return false;
+    
+    return true;
+  }
+  
+  /**
+   * @param rt
+   * @return
+   */
+  private Vector<Long> getRealNeighbors(RoutingTable rt)
+  {
+    Vector<Long> neighbors = new Vector<Long>();
+    if (rt!= null)
+    {
+      for (int j = 0; j< rt.getPred().size(); j++)
+        neighbors.add(rt.getPred().get(j).getID());
+      for(int j = 0; j <rt.getSucc().size(); j++)
+        neighbors.add(rt.getSucc().get(j).getID());
+    }
+   return neighbors;
+  }
+
+
+
+  private Vector<Long> getBestNeighbors(int topic, long id)
+  {
+    Vector<Long> subscribers = TopicsRepository.getSubscribers(topic);
+    Vector<Long> bestNeighbors = new Vector<Long>();
+    
+    Collections.sort(subscribers);
+    bestNeighbors.addAll(getBestHalfNeighbors(subscribers, id));
+    
+    Collections.reverse(subscribers);
+    bestNeighbors.addAll(getBestHalfNeighbors(subscribers, id));
+    
+    Collection<Long> noDup = new LinkedHashSet<Long>(bestNeighbors);
+    bestNeighbors.clear();
+    bestNeighbors.addAll(noDup);    
+    
+    return bestNeighbors;
+  }
+  
+  /**
+   * The method returns the successors if subscribers are in ascendent order and predecessors otherwise
+   * The method is customized for 2 succ and 2 pred
+   * @param subscribers
+   * @param id
+   * @return
+   */
+  private Vector<Long> getBestHalfNeighbors(Vector<Long> subscribers, long id)
+  {
+    int index = subscribers.indexOf(id);
+    Vector<Long> neighbors = new Vector<Long>();
+    for (int i = index+1; i<= index+2; i++)
+      neighbors.add(subscribers.get(i%subscribers.size()));
+    return neighbors;
+  }
+}

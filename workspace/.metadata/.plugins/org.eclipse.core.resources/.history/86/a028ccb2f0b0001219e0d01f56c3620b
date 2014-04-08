@@ -1,0 +1,15 @@
+package poldercast.subscriptions;
+
+/**
+ * 
+ * @author anca
+ * 
+ */
+
+public interface Topics
+{
+  /*
+   * Method to get topics to be assigned to a node with id nodeIndex
+   * */
+  Object getTopics(int nodeIndex);
+}

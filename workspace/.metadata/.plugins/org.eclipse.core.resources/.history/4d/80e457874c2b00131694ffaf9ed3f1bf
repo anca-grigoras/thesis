@@ -1,0 +1,267 @@
+CV                       20
+CG                       10
+
+VV						 20
+VG						 10
+
+RV						 4
+RG						 10
+
+NODES                    1000
+CYCLE                    60000
+TICKS_PER_CYCLE 		 60000
+
+engine.mode              sim
+engine.duration          CYCLE *200
+random.seed              0
+network.size             NODES
+
+#######################
+# POLDERCAST PROTOCOL #
+#######################
+
+include.protocol         cyclon, vicinity, rings, dissemination
+
+protocol.cyclon          poldercast.protocols.Cyclon
+{
+  descriptor             poldercast.descriptor.DescriptorTopics
+  settings               poldercast.protocols.CyclonSettings
+  
+  view                   CV
+  gossip                 CG
+
+  step                   TICKS_PER_CYCLE
+  to					 4*TICKS_PER_CYCLE
+  randstart
+
+  transport              trans
+}
+
+protocol.vicinity		 poldercast.protocols.Vicinity
+{
+  linkable				 cyclon, rings
+  
+  descriptor			 poldercast.descriptor.DescriptorTopics
+  settings				 poldercast.protocols.VicinitySettings
+  
+  sendLinkableItems		 true
+  
+  view					 VV
+  gossip				 VG
+  
+  step					 TICKS_PER_CYCLE
+  randstart
+  
+  transport				 trans
+}
+
+protocol.rings			 poldercast.protocols.Rings
+{
+  linkable				 cyclon, vicinity
+  
+  descriptor			 poldercast.descriptor.DescriptorTopics
+  settings				 poldercast.protocols.RingsSettings
+  
+  sendLinkableItems		 true
+  
+  view					 RV
+  gossip				 RG
+  
+  step					 TICKS_PER_CYCLE
+  randstart
+  
+  transport				 trans
+}
+
+protocol.dissemination	 poldercast.protocols.Dissemination
+{
+  linkable			     rings
+  
+  routing				 rings
+  fanout				 2
+	
+  descriptor			 poldercast.descriptor.DescriptorTopics
+  settings				 poldercast.protocols.DisseminationSettings
+  
+  sendLinkableItems		 true
+  
+  step					 TICKS_PER_CYCLE
+  randstart
+  
+  transport				 trans
+}
+transport.trans          peernet.transport.UniformRandomTransport
+{
+  mindelay               5
+  maxdelay               10
+}
+
+
+
+include.init             bootstrap, topic_initializer
+
+init.bootstrap           peernet.dynamics.WireKOut
+{
+  protocol               cyclon
+  k                      4
+}
+
+init.topic_initializer 	 poldercast.initializers.NodeTopicsInitializer
+{
+  protocol				 vicinity
+ 
+ data                   poldercast.topics.TopicsRepository
+ {
+   file					data/fb_1ksample.txt
+ }
+
+}
+
+
+
+###################
+#    OBSERVERS    #
+###################
+
+include.control          traffic, log
+
+control.log	     		poldercast.observers.Log
+{
+	step				TICKS_PER_CYCLE
+	from                TICKS_PER_CYCLE
+	protocol			dissemination
+	path				logs/gum.txt
+}
+
+
+control.ball             peernet.reports.BallExpansion
+{
+  protocol               cyclon
+  n                      1
+}
+
+control.degree          peernet.reports.DegreeStats
+{
+  trace
+  #step                  10 * TICKS_PER_CYCLE
+  step                  TICKS_PER_CYCLE
+  protocol              rings
+  undir
+  #at                    1000
+  method                freq
+}
+
+control.view 			poldercast.observers.ViewObserver
+{
+	step				TICKS_PER_CYCLE
+	protocol			vicinity
+	viewlen				VV
+}
+
+control.neighbors		poldercast.observers.NeighborsObserver
+{
+	step				TICKS_PER_CYCLE
+	protocol			vicinity
+}
+
+control.conv		    poldercast.observers.IncompleteRings
+{
+	step				TICKS_PER_CYCLE
+	protocol			rings
+}
+
+control.missedLinks		    poldercast.observers.MissedRingsLinks
+{
+	step				TICKS_PER_CYCLE
+	protocol			rings
+}
+
+control.traffic			poldercast.observers.TrafficGenerator
+{
+	step				TICKS_PER_CYCLE
+	protocol			dissemination
+}
+
+control.hitRatio		poldercast.observers.HitRatio
+{
+	step				TICKS_PER_CYCLE
+	from                TICKS_PER_CYCLE
+	protocol			dissemination
+}
+
+control.speed			poldercast.observers.DisseminationSpeed
+{
+	step				TICKS_PER_CYCLE
+	from                TICKS_PER_CYCLE
+	protocol			dissemination				
+}
+
+control.prog  		    poldercast.observers.DisseminationProgress
+{
+	step				TICKS_PER_CYCLE
+	from                TICKS_PER_CYCLE
+	protocol			dissemination	
+}
+
+control.dup				poldercast.observers.DuplicationFactor
+{
+	step				TICKS_PER_CYCLE
+	from                TICKS_PER_CYCLE
+	protocol			dissemination				
+}
+
+control.overlay			poldercast.observers.OverlayDegree
+{
+	step				TICKS_PER_CYCLE
+	from                TICKS_PER_CYCLE
+	protocol			rings		
+}
+
+control.consumption		poldercast.observers.BandwithConsumption
+{
+	step				TICKS_PER_CYCLE
+	from                TICKS_PER_CYCLE
+	protocol			dissemination	
+}
+
+control.msgOverhead		poldercast.observers.MessageOverhead
+{
+	step				TICKS_PER_CYCLE
+	from                TICKS_PER_CYCLE
+	protocol			dissemination	
+}
+
+control.subsize 		poldercast.observers.ScalabilitySubscriptionSize
+{
+	step				TICKS_PER_CYCLE
+	from                TICKS_PER_CYCLE
+	protocol			rings	
+}
+	
+control.topicpop 		poldercast.observers.TopicPopularity
+{
+	step				TICKS_PER_CYCLE
+	from                TICKS_PER_CYCLE
+	protocol			rings	
+}	
+
+control.load			poldercast.observers.DistributionLoad
+{
+	step				TICKS_PER_CYCLE
+	from                TICKS_PER_CYCLE
+	protocol			dissemination	
+}
+
+control.delayDistr		poldercast.observers.DelayDistribution
+{
+	step				TICKS_PER_CYCLE
+	from                TICKS_PER_CYCLE
+	protocol			dissemination	
+}
+
+control.dfDisrt			poldercast.observers.DFDistribution
+{
+	step				TICKS_PER_CYCLE
+	from                TICKS_PER_CYCLE
+	protocol			dissemination	
+}

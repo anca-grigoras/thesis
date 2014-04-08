@@ -1,0 +1,3 @@
+#!/bin/bash
+
+prun -v -1 -t 1:00:00 -np $1 -panda run

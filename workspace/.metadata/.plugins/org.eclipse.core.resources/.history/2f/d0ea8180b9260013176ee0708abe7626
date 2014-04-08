@@ -1,0 +1,19 @@
+/**
+ * 
+ */
+package tera.architecture;
+
+/**
+ * @author anca
+ *
+ */
+public class SubscriptionManagement
+{
+  /**
+   * 
+   */
+  public SubscriptionManagement()
+  {
+    // TODO Auto-generated constructor stub
+  }
+}

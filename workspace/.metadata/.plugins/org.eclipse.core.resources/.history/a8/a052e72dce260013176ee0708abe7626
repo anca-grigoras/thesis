@@ -1,0 +1,22 @@
+/**
+ * 
+ */
+package tera.architecture;
+
+import java.util.HashMap;
+
+/**
+ * @author anca
+ *
+ */
+public class AccessPointsLookup
+{
+  private static HashMap<Integer, Long> apt = new HashMap<Integer, Long>();
+  /**
+   * 
+   */
+  public AccessPointsLookup()
+  {
+    // TODO Auto-generated constructor stub
+  }
+}
