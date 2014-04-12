@@ -20,7 +20,6 @@ import peernet.core.Control;
 import peernet.core.Descriptor;
 import peernet.core.Network;
 import peernet.core.Node;
-import sun.security.krb5.internal.crypto.Des;
 import topics.Topic;
 import topics.TopicsRepository;
 import vitis.protocols.Cyclon;

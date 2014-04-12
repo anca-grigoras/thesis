@@ -1,4 +1,4 @@
-<project name="Peersim" default="compile" basedir=".">
+<project name="PeerNet" default="compile" basedir=".">
 
 	<!-- set global properties for this build -->
 	<property name="src" location="src" />
@@ -6,7 +6,7 @@
 	<property name="doc" location="doc" />
 
 	<!-- Packages to be included in the Javadoc generation -->
-	<property name="packages" value="peersim.*,example.*"/>
+	<property name="packages" value="peernet.*,example.*"/>
 		
 	<!-- Path for compilation -->
 	<path id="compile.path">
