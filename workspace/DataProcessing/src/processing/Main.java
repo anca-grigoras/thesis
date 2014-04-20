@@ -157,6 +157,8 @@ public class Main {
 	private static void logPublishedEvents() {
 		File file = new File(ReadData.CYCLE_PATH);
 		BufferedReader bufferReader = null;
+		File hitRatioFile = new File("results/" + PROT + "/hitRatio.dat");
+		BufferedWriter hitBuf = null;
 		long start = FROM*cycleInterval;
 		long end = start + cycleInterval;
 		int cycle = 0;
@@ -164,6 +166,7 @@ public class Main {
 		boolean goOn = true;
 		
 		try {
+			hitBuf = new BufferedWriter(new FileWriter(hitRatioFile));
 			while (goOn)
 			{
 				cycle++;
@@ -235,7 +238,7 @@ public class Main {
 				System.out.println(numOfMessagesPerCycle + " published events per cycle");
 				System.out.println(sent + numOfMessagesPerCycle + " total messages sent per cycle");
 				
-				processHitRatio(publishedEvents, numOfMessagesPerCycle, cycle);
+				processHitRatio(publishedEvents, numOfMessagesPerCycle, cycle, hitBuf);
 				
 				
 				start += cycleInterval;
@@ -256,6 +259,11 @@ public class Main {
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
+			try {
+				hitBuf.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 		}
 	}
 	
@@ -264,14 +272,14 @@ public class Main {
 	 * @param publishedEvents
 	 * @param numOfMessagesPerCycle
 	 * @param cycle
+	 * @param hitBuf 
 	 */
-	private static void processHitRatio(HashMap<Long, Vector<SimpleEntry<Integer, Long>>> publishedEvents, long numOfMessagesPerCycle, int cycle)
+	private static void processHitRatio(HashMap<Long, Vector<SimpleEntry<Integer, Long>>> publishedEvents, long numOfMessagesPerCycle, int cycle, BufferedWriter hitBuf)
 	{
 		double completeDisseminations = 0;
 		double totalHits = 0;
 		
-		File hitRatioFile = new File("results/" + PROT + "/hitRatio.dat");
-		BufferedWriter hitBuf = null;
+		
 		
 		Set<Entry<Long,Vector<AbstractMap.SimpleEntry<Integer, Long>>>> set = publishedEvents.entrySet();
 		Iterator<Entry<Long, Vector<SimpleEntry<Integer, Long>>>> it = set.iterator();
@@ -309,19 +317,13 @@ public class Main {
 		System.out.println(cycle + " " + missRatio + " " + missDis);
 		
 		try {
-			hitBuf = new BufferedWriter(new FileWriter(hitRatioFile));
-			
 			hitBuf.write(cycle + " " + missRatio + " " + missDis);
 			hitBuf.newLine();
 			hitBuf.flush();
 		} catch (IOException e1) {
 			e1.printStackTrace();
 		}
-		try {
-			hitBuf.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+		
 				
 	}
 }
