@@ -113,7 +113,7 @@ public class ReadData {
 			String line = "";
 			for (int i = 0; i< nrFiles; i++)
 			{
-				files[i] = new File(args[i+1]);
+				files[i] = new File(args[i+3]);
 				buf = new BufferedReader(new FileReader(files[i]));
 				
 				while ((line = buf.readLine()) != null) {

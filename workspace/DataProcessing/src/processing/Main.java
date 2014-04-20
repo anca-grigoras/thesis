@@ -22,16 +22,20 @@ import java.util.Map.Entry;
 public class Main {
 
 	private static final String PROT = "poldercast";
-	private static final int cycleInterval = 6000;
-	private static final int from = 1;
-	private static final int numOfCycles = 100;
+	private static final int FROM = 5;
+	
+	private static int cycleInterval;
+	private static int numOfCycles;
+	
 
 	/**
 	 * @param args
 	 */
 	public static void main(String[] args) 
 	{
-
+		cycleInterval = Integer.parseInt(args[0]);
+		numOfCycles = Integer.parseInt(args[1]);
+		
 		readData(args);
 		processData();
 		cleanData();
@@ -45,9 +49,9 @@ public class Main {
 	 */
 	private static void readData(String[] args) 
 	{
-		ReadData.readTopics(args[0]);
+		ReadData.readTopics(args[2]);
 
-		int nrFiles = args.length-1;
+		int nrFiles = args.length-3;
 		ReadData.readResultFiles(new File[nrFiles], nrFiles, args);
 	}
 
@@ -72,7 +76,7 @@ public class Main {
 		File file = new File(ReadData.CYCLE_PATH);
 		BufferedReader bufferReader = null;
 		long start, end;
-		start = from*cycleInterval;
+		start = FROM*cycleInterval;
 		end = start + cycleInterval;
 		int cycle = 0;
 		Vector<Long> msgs = new Vector<Long>();
@@ -143,9 +147,6 @@ public class Main {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} 
-		
-
-		
 	}
 
 	/**
@@ -156,7 +157,7 @@ public class Main {
 	private static void logPublishedEvents() {
 		File file = new File(ReadData.CYCLE_PATH);
 		BufferedReader bufferReader = null;
-		long start = from*cycleInterval;
+		long start = FROM*cycleInterval;
 		long end = start + cycleInterval;
 		int cycle = 0;
 		String line;
