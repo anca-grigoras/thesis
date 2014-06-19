@@ -19,7 +19,7 @@ import java.util.Map.Entry;
  * @author anca
  *
  */
-public class Main {
+public class Main { 
 
 	private static final String PROT = "poldercast";
 	private static final int FROM = 5;
@@ -69,7 +69,7 @@ public class Main {
 		ReadData.deleteCycleFiles();		
 	}
 
-	/**
+	/** 
 	 * 
 	 */
 	private static void checkLostMessages() {
