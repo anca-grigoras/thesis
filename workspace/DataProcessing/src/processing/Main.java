@@ -82,7 +82,7 @@ public class Main {
 		Vector<Long> msgs = new Vector<Long>();
 		try {
 			
-			String line;
+			String line; 
 			boolean goOn = true;
 			while (goOn)
 			{
