@@ -67,9 +67,10 @@ public class Main {
 	 */
 	private static void cleanData() {
 		ReadData.deleteCycleFiles();		
+		String a = "tes";
 	}
  
-	/** 
+	/**  
 	 * 
 	 */
 	private static void checkLostMessages() {

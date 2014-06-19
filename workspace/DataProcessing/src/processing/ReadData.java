@@ -82,7 +82,7 @@ public class ReadData {
 			subscribers.put(topic, v); 
 		}  
 	} 
-	
+	 
 	/**
 	 * @return the subscribers
 	 */
@@ -104,7 +104,7 @@ public class ReadData {
 	 * @param nrFiles 
 	 */
 	public static void readResultFiles(File[] files, int nrFiles, String[] args) {
-		
+		String sd = "asdf";
 		File outfile = new File(CYCLE_PATH);
 		BufferedReader buf = null;
 		BufferedWriter outbuf = null;
