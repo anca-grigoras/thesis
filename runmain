@@ -1,10 +1,10 @@
 #!/bin/bash
 
-cyc=`grep "engine.duration" /home/gto500/hubu/workspace/PeerNetProtocolsAnca/configurations/poldercast-net.cfg | cut -d'*' -f2`
+cyc=`grep "engine.duration" /home/ags670/thesis/workspace/PeerNetProtocolsAnca/configurations/poldercast-net.cfg | cut -d'*' -f2`
 cyc=$(( $cyc - 6 ))
 echo $cyc
 
-tpc=`grep "^\TICKS_PER_CYCLE" /home/gto500/hubu/workspace/PeerNetProtocolsAnca/configurations/poldercast-net.cfg | cut -d' ' -f3`
+tpc=`grep "^\TICKS_PER_CYCLE" /home/ags670/thesis/workspace/PeerNetProtocolsAnca/configurations/poldercast-net.cfg | cut -d' ' -f3`
 
 echo $tpc
 
