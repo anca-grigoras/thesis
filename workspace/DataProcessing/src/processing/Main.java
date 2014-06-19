@@ -68,7 +68,7 @@ public class Main {
 	private static void cleanData() {
 		ReadData.deleteCycleFiles();		
 	}
-
+ 
 	/** 
 	 * 
 	 */

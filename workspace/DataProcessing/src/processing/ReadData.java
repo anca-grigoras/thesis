@@ -80,7 +80,7 @@ public class ReadData {
 			Vector<Integer> v = new Vector<Integer>();
 			v.add(key);
 			subscribers.put(topic, v); 
-		} 
+		}  
 	} 
 	
 	/**
