@@ -9,4 +9,4 @@ tpc=`grep "^\TICKS_PER_CYCLE" /home/ags670/thesis/workspace/PeerNetProtocolsAnca
 echo $tpc
 
 javac Main.java
-java Main $cyc $tpc fb_1ksample.txt workspace/PeerNetProtocolsAnca/results/logs/*.txt 
+java Main $cyc $tpc fb_1ksample.txt workspace/PeerNetProtocolsAnca/logs/*.txt 
