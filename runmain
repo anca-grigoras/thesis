@@ -11,4 +11,4 @@ echo $tpc
 #javac Main.java
 #java Main $cyc $tpc fb_1ksample.txt workspace/PeerNetProtocolsAnca/logs/*.txt 
 
-java -cp workspace/DataProcessing/bin/ processing.Main $cyc $tpc fb_1ksample.txt workspace/PeerNetProtocolsAnca/logs/*.txt
+java -cp workspace/DataProcessing/bin/ processing.Main $tpc $cyc fb_1ksample.txt workspace/PeerNetProtocolsAnca/logs/*.txt
