@@ -158,7 +158,7 @@ public class Main {
 	private static void logPublishedEvents() {
 		File file = new File(ReadData.CYCLE_PATH);
 		BufferedReader bufferReader = null;
-		File hitRatioFile = new File("results/" + PROT + "/hitRatio.dat");
+		File hitRatioFile = new File("/home/ags670/thesis/workspace/PeerNetProtocolsAnca/results/" + PROT + "/hitRatio.dat");
 		BufferedWriter hitBuf = null;
 		long start = FROM*cycleInterval;
 		long end = start + cycleInterval;
