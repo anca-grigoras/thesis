@@ -122,7 +122,7 @@ public class Dissemination extends Protocol
       }
       selectedIds.add(randomDescr);
       remaining--;
-      try{Thread.sleep(new Random().nextInt(700));}
+      try{Thread.sleep(new Random().nextInt(100));}
       catch (InterruptedException e){e.printStackTrace();}
       send(randomDescr.address, pid, newTe);
       writeToFile(selfDescr, newTe, "s");
@@ -153,7 +153,7 @@ public class Dissemination extends Protocol
       fanout--;
       isSent = true;
       //System.out.println("sender: " + senderId + ", current " +te.sender.getID() + "(hops: "+ te.hops + "), to " + descr.getID() + " -> " + descr.address);
-      try{Thread.sleep(new Random().nextInt(700));}
+      try{Thread.sleep(new Random().nextInt(100));}
       catch (InterruptedException e){e.printStackTrace();}
       
       send(descr.address, pid, te);      
