@@ -10,7 +10,6 @@ import java.util.HashMap;
 import java.util.Vector;
 import java.util.concurrent.locks.ReentrantLock;
 
-
 import peernet.core.CommonState;
 import peernet.core.Descriptor;
 import peernet.core.Node;
@@ -22,6 +21,7 @@ import poldercast.topics.RoutingTable;
 import topics.Topic;
 import topics.TopicsRepository;
 
+import java.util.Random;
 /**
  * @author anca
  *
@@ -122,6 +122,8 @@ public class Dissemination extends Protocol
       }
       selectedIds.add(randomDescr);
       remaining--;
+      try{Thread.sleep(new Random().nextInt(700));}
+      catch (InterruptedException e){e.printStackTrace();}
       send(randomDescr.address, pid, newTe);
       writeToFile(selfDescr, newTe, "s");
     }
@@ -151,6 +153,9 @@ public class Dissemination extends Protocol
       fanout--;
       isSent = true;
       //System.out.println("sender: " + senderId + ", current " +te.sender.getID() + "(hops: "+ te.hops + "), to " + descr.getID() + " -> " + descr.address);
+      try{Thread.sleep(new Random().nextInt(700));}
+      catch (InterruptedException e){e.printStackTrace();}
+      
       send(descr.address, pid, te);      
       writeToFile(selfDescr, te, "s");
     }
