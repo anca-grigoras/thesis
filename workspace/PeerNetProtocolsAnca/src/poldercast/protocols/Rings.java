@@ -40,14 +40,6 @@ public class Rings extends Gossip
   {
     Descriptor selfDescr = createDescriptor();
     Vector<Descriptor> neighborsFromAllProtocols = collectAllNeighbors(node, protocolID);
-    
-   //System.out.println(node.getID() + "----------");
-   /* for (Descriptor d : neighborsFromAllProtocols)
-    {
-     System.out.print(d.getID() + " ");
-     ((DescriptorTopics)d).printId();
-    }
-    System.out.println("----------");*/
    
     selectToKeep(ringsSettings.viewLen/2, selfDescr, neighborsFromAllProtocols); 
     insertToView();
