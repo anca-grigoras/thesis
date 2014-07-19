@@ -69,6 +69,7 @@ public class TransportUDP extends TransportNet
       oos.writeObject(payload);
       DatagramPacket datagramPacket = new DatagramPacket(baos.toByteArray(),
           baos.size(), ((AddressNet) dest).ip, ((AddressNet) dest).port);
+      System.out.println(baos.size());
       socket.send(datagramPacket);
     }
     catch (IOException e)
